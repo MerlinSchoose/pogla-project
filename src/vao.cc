@@ -1,11 +1,11 @@
-//
-// Created by simon on 7/15/21.
-//
-
 #include "vao.hh"
 
-Vao *
-Vao::make_vao(GLuint vertex_location, std::vector<GLfloat> vertices, GLuint texture_id, GLuint uv_location, std::vector<GLfloat> uv, std::vector<GLuint> indices) {
+Vao *Vao::make_vao(GLuint vertex_location,
+                   std::vector<GLfloat> vertices,
+                   GLuint texture_id,
+                   GLuint uv_location,
+                   std::vector<GLfloat> uv,
+                   std::vector<GLuint> indices) {
     auto vao = new Vao;
     glBindVertexArray(vao->id);TEST_OPENGL_ERROR();
     if (vertex_location != -1) vao->vbo_ids.push_back(-1);

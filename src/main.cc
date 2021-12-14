@@ -1,33 +1,31 @@
 #include <iostream>
 #include <vector>
+#include <ctime>
 
 #include "opengl.hh"
 #include "object_vbo.hh"
 #include "image_io.hh"
 #include "shaders.hh"
 #include "obj_loader.hh"
-#include "vao.hh"
 #include "camera.hh"
+#include "objects.hh"
 
 #define CAUSTICS_SIZE 512
 
-Vao *floor_vao;
-Vao *surface_vao;
-Vao *background_vao;
-
-std::vector<Vao *> fish_vaos;
-std::vector<Vao *> fish_2_vaos;
-std::vector<Vao *> fish_3_vaos;
-std::vector<Vao *> fish_4_vaos;
-std::vector<Vao *> rock_vaos;
-std::vector<Vao *> grass_vaos;
-std::vector<Vao *> grass_2_vaos;
-std::vector<Vao *> grass_3_vaos;
-
+// PROGRAMS
 program *surface_program;
 program *background_program;
 program *obj_program;
 
+// VAOS IDS
+Vao *floor_vao;
+Vao *surface_vao;
+Vao *background_vao;
+
+// OBJECTS
+std::vector<Object> objects;
+
+// TEXTURES VARIABLES
 GLuint caustic_idx = 0;
 GLuint caustic_begin = 1;
 GLuint timer = 1000 / 60;
@@ -35,6 +33,7 @@ GLuint timer = 1000 / 60;
 GLuint blue_texture_id;
 GLuint floor_texture_id;
 
+// CAMERA VARIABLES
 Camera camera(glm::vec3(0.0f, -40.0f, 0.0f),
               glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -50,8 +49,10 @@ struct key_being_pressed {
     bool a;
     bool d;
     bool s;
+    bool shift;
 } keyBeingPressed;
 
+// GLUT HANDLING FUNCTIONS (CAMERA + TIMER)
 void window_resize(int width, int height) {
     glViewport(0,0,width,height);TEST_OPENGL_ERROR();
 }
@@ -113,6 +114,18 @@ void keyboardPressFunctionCallback(unsigned char c, int x, int y) {
     }
 }
 
+void keyboardSpecialPressFunctionCallback(int c, int x, int y) {
+    switch (c) {
+        // shift to move faster.
+        case GLUT_KEY_SHIFT_L:
+            camera.shift_pressed(true);
+            break;
+        case GLUT_KEY_SHIFT_R:
+            camera.shift_pressed(true);
+            break;
+    }
+}
+
 void keyboardReleaseFunctionCallback(unsigned char c, int x, int y) {
     switch (c) {
         // w to move forward.
@@ -136,6 +149,18 @@ void keyboardReleaseFunctionCallback(unsigned char c, int x, int y) {
         // Escape button to exit.
         case 27:
             exit(0);
+            break;
+    }
+}
+
+void keyboardSpecialReleaseFunctionCallback(int c, int x, int y) {
+    switch (c) {
+        // shift to move faster.
+        case GLUT_KEY_SHIFT_L:
+            camera.shift_pressed(false);
+            break;
+        case GLUT_KEY_SHIFT_R:
+            camera.shift_pressed(false);
             break;
     }
 }
@@ -184,25 +209,17 @@ void timerFunc(int value) {
 }
 
 
-void display() {
-    int elapsed_time = glutGet(GLUT_ELAPSED_TIME);
-    delta_time = elapsed_time - last_time;
-    last_time = elapsed_time;
-
-    keyboardToCamera();
-    updateCamera();
-
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
-
-    surface_program->use();
-
-    floor_vao->draw();
-
-    surface_vao->draw();
-
+// DISPLAY FUNCTIONS
+void object_display() {
     obj_program->use();
 
-    GLuint mv_loc = glGetUniformLocation(obj_program->id, "model_matrix");TEST_OPENGL_ERROR();
+    GLint mv_loc = glGetUniformLocation(obj_program->id, "model_matrix");TEST_OPENGL_ERROR();
+
+    for (auto& obj : objects) {
+        obj.draw(mv_loc);
+    }
+
+    /* GLuint mv_loc = glGetUniformLocation(obj_program->id, "model_matrix");TEST_OPENGL_ERROR();
     auto model_matrix = glm::rotate(glm::translate(glm::vec3(-20.0f, -40.f, -40.f)), glm::radians(90.f), glm::vec3(0,1,0));
     glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
     for (auto vao: fish_vaos) {
@@ -284,6 +301,25 @@ void display() {
     for (auto vao: grass_3_vaos) {
         vao->draw();
     }
+    */
+}
+
+void display() {
+    int elapsed_time = glutGet(GLUT_ELAPSED_TIME);
+    delta_time = elapsed_time - last_time;
+    last_time = elapsed_time;
+
+    keyboardToCamera();
+    updateCamera();
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
+
+    surface_program->use();
+
+    floor_vao->draw();
+    surface_vao->draw();
+
+    object_display();
 
     background_program->use();
 
@@ -295,6 +331,7 @@ void display() {
 }
 
 
+// INIT FUNCTIONS
 void init_glut(int &argc, char *argv[]) {
     glutInit(&argc, argv);
     glutInitContextVersion(4,6);
@@ -314,7 +351,9 @@ void init_glut(int &argc, char *argv[]) {
     glutMotionFunc(motionFunctionCallback);
     glutMouseFunc(mouseFunctionCallback);
     glutKeyboardFunc(keyboardPressFunctionCallback);
+    glutSpecialFunc(keyboardSpecialPressFunctionCallback);
     glutKeyboardUpFunc(keyboardReleaseFunctionCallback);
+    glutSpecialUpFunc(keyboardSpecialReleaseFunctionCallback);
 
     glutReportErrors();
 }
@@ -402,6 +441,67 @@ std::vector<Vao *> init_obj_vao(const char *filename) {
 
     glBindVertexArray(0);
     return obj_vaos;
+}
+
+void init_objects() {
+    std::vector<Vao *> fish_vaos = init_obj_vao("../image_test/objs/Fish1.obj");
+    std::vector<Vao *> fish_2_vaos = init_obj_vao("../image_test/objs/Fish2.obj");
+    // std::vector<Vao *> fish_3_vaos = init_obj_vao("../image_test/objs/Manta ray.obj");
+    // std::vector<Vao *> fish_4_vaos = init_obj_vao("../image_test/objs/Shark.obj");
+    std::vector<Vao *> rock_vaos = init_obj_vao("../image_test/objs/Rock1.obj");
+    std::vector<Vao *> grass_vaos = init_obj_vao("../image_test/objs/Grass1.obj");
+    std::vector<Vao *> grass_2_vaos = init_obj_vao("../image_test/objs/Grass2.obj");
+    std::vector<Vao *> grass_3_vaos = init_obj_vao("../image_test/objs/Grass3.obj");
+
+    for (size_t i = 0; i < 100; ++i) {
+        objects.emplace_back(
+                Object(objects, fish_vaos,
+                       glm::vec3(-500.f, -49.5f, -500.f),
+                       glm::vec3(500.f, -5.f, 500.f),
+                       .5f, 2.f, 0.f, 180.f,
+                       glm::vec3(0.f, 1.f, 0.f), 5.f
+                ));
+
+        objects.emplace_back(
+                Object(objects, fish_2_vaos,
+                       glm::vec3(-500.f, -49.5f, -500.f),
+                       glm::vec3(500.f, -5.f, 500.f),
+                       .1f, 1.f, 0.f, 180.f,
+                       glm::vec3(0.f, 1.f, 0.f), 5.f
+                ));
+
+        objects.emplace_back(
+                Object(objects, rock_vaos,
+                       glm::vec3(-500.f, -49.5f, -500.f),
+                       glm::vec3(500.f, -49.5f, 10.f),
+                       5.f, 10.f, 0.f, 180.f,
+                       glm::vec3(0.f, 1.f, 0.f), 5.f
+                ));
+
+        objects.emplace_back(
+                Object(objects, grass_vaos,
+                       glm::vec3(-500.f, -49.5f, -500.f),
+                       glm::vec3(500.f, -49.5f, 10.f),
+                       15.f, 50.f, 0.f, 180.f,
+                       glm::vec3(0.f, 1.f, 0.f), 1.f
+                ));
+
+        objects.emplace_back(
+                Object(objects, grass_2_vaos,
+                       glm::vec3(-500.f, -49.5f, -500.f),
+                       glm::vec3(500.f, -49.5f, 10.f),
+                       15.f, 50.f, 0.f, 180.f,
+                       glm::vec3(0.f, 1.f, 0.f), 1.f
+                ));
+
+        objects.emplace_back(
+                Object(objects, grass_3_vaos,
+                       glm::vec3(-500.f, -49.5f, -500.f),
+                       glm::vec3(500.f, -49.5f, 10.f),
+                       15.f, 50.f, 0.f, 180.f,
+                       glm::vec3(0.f, 1.f, 0.f), 1.f
+                       ));
+    }
 }
 
 void init_background_vao() {
@@ -522,7 +622,7 @@ bool init_shaders() {
     return true;
 }
 
-
+// MAIN
 int main(int argc, char *argv[]) {
     init_glut(argc, argv);
     if (!init_glew())
@@ -539,14 +639,9 @@ int main(int argc, char *argv[]) {
     obj_program->use();
     init_uniform(obj_program->id);
 
-    fish_vaos = init_obj_vao("../image_test/objs/Fish1.obj");
-    fish_2_vaos = init_obj_vao("../image_test/objs/Fish2.obj");
-    fish_3_vaos = init_obj_vao("../image_test/objs/Manta ray.obj");
-    fish_4_vaos = init_obj_vao("../image_test/objs/Shark.obj");
-    rock_vaos = init_obj_vao("../image_test/objs/Rock1.obj");
-    grass_vaos = init_obj_vao("../image_test/objs/Grass1.obj");
-    grass_2_vaos = init_obj_vao("../image_test/objs/Grass2.obj");
-    grass_3_vaos = init_obj_vao("../image_test/objs/Grass3.obj");
+    init_objects();
+
+    // init_obj_positions();
 
     background_program->use();
     init_background_vao();

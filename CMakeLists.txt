@@ -15,6 +15,7 @@ add_executable(main
         src/image_io.cc
         src/shaders.cc
         src/vao.cc
-        src/camera.cc)
+        src/camera.cc
+        src/objects.cc)
 
 target_link_libraries( ${PROJECT_NAME} -lGLEW -lGL -lglut -lGLU)

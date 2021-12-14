@@ -241,7 +241,7 @@ namespace objl
             return (a.X * b.X) + (a.Y * b.Y) + (a.Z * b.Z);
         }
 
-        // Angle between 2 Vector3 Objects
+        // Angle between 2 Vector3 objects
         float AngleBetweenV3(const Vector3 a, const Vector3 b)
         {
             float angle = DotV3(a, b);
@@ -712,13 +712,13 @@ namespace objl
             }
         }
 
-        // Loaded Mesh Objects
+        // Loaded Mesh objects
         std::vector<Mesh> LoadedMeshes;
-        // Loaded Vertex Objects
+        // Loaded Vertex objects
         std::vector<Vertex> LoadedVertices;
         // Loaded Index Positions
         std::vector<unsigned int> LoadedIndices;
-        // Loaded Material Objects
+        // Loaded Material objects
         std::vector<Material> LoadedMaterials;
 
     private:

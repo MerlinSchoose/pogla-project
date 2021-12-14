@@ -18,7 +18,12 @@ public:
 
     void draw();
 
-    static Vao *make_vao(GLuint vertex_location, std::vector<GLfloat> vertices, GLuint texture_id = -1, GLuint uv_location = -1, std::vector<GLfloat> uv = std::vector<GLfloat>(), std::vector<GLuint> indices = std::vector<GLuint>());
+    static Vao *make_vao(GLuint vertex_location,
+                         std::vector<GLfloat> vertices,
+                         GLuint texture_id = -1,
+                         GLuint uv_location = -1,
+                         std::vector<GLfloat> uv = std::vector<GLfloat>(),
+                         std::vector<GLuint> indices = std::vector<GLuint>());
 
     GLuint id;
     std::vector<GLuint> vbo_ids;
