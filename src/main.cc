@@ -7,10 +7,9 @@
 #include "shaders.hh"
 #include "obj_loader.hh"
 #include "vao.hh"
+#include "camera.hh"
 
 #define CAUSTICS_SIZE 512
-
-//#define SAVE_RENDER
 
 Vao *floor_vao;
 Vao *surface_vao;
@@ -25,7 +24,7 @@ std::vector<Vao *> grass_vaos;
 std::vector<Vao *> grass_2_vaos;
 std::vector<Vao *> grass_3_vaos;
 
-program *main_program;
+program *surface_program;
 program *background_program;
 program *obj_program;
 
@@ -36,22 +35,166 @@ GLuint timer = 1000 / 60;
 GLuint blue_texture_id;
 GLuint floor_texture_id;
 
-glm::vec3 camera_pos = glm::vec3(0.0f, -40.0f,  0.0f);
-glm::vec3 camera_front = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 camera_up = glm::vec3(0.0f, 1.0f,  0.0f);
-float camera_speed = 3.0f;
+Camera camera(glm::vec3(0.0f, -40.0f, 0.0f),
+              glm::vec3(0.0f, 1.0f, 0.0f));
+
+int lastXMouse = 0;
+int lastYMouse = 0;
+bool firstMouse = true;
+
+int delta_time = 0;
+int last_time = 0;
+
+struct key_being_pressed {
+    bool w;
+    bool a;
+    bool d;
+    bool s;
+} keyBeingPressed;
 
 void window_resize(int width, int height) {
     glViewport(0,0,width,height);TEST_OPENGL_ERROR();
 }
 
-#if defined(SAVE_RENDER)
-bool saved = false;
-#endif
+void motionFunctionCallback(int x, int y) {
+    if (firstMouse) {
+        lastXMouse = x;
+        lastYMouse = y;
+        firstMouse = false;
+    }
+
+    int xoffset = x - lastXMouse;
+    int yoffset = lastYMouse - y;
+    lastXMouse = x;
+    lastYMouse = y;
+    camera.processMouse(xoffset, yoffset);
+}
+
+void mouseFunctionCallback(int button, int state, int x, int y) {
+    // Wheel input reports as 3 (scroll up) and 4 (scroll down)
+    if (button == 3 || button == 4) {
+        if (state == GLUT_UP) return;
+        float offset = 1.f;
+        if (button == 3)
+            camera.processScroll(offset);
+        else
+            camera.processScroll(-offset);
+    }
+    else if (button == GLUT_LEFT_BUTTON || button == GLUT_RIGHT_BUTTON) {
+        if (state == GLUT_DOWN)
+            firstMouse = true;
+    }
+}
+
+void keyboardPressFunctionCallback(unsigned char c, int x, int y) {
+    switch (c) {
+        // w to move forward.
+        case 'w':
+            keyBeingPressed.w = true;
+            break;
+        // s to move backward.
+        case 's':
+            keyBeingPressed.s = true;
+            break;
+
+        // a to straff left.
+        case 'a':
+            keyBeingPressed.a = true;
+            break;
+        // d to straff right.
+        case 'd':
+            keyBeingPressed.d = true;
+            break;
+
+        // Escape button to exit.
+        case 27:
+            exit(0);
+            break;
+    }
+}
+
+void keyboardReleaseFunctionCallback(unsigned char c, int x, int y) {
+    switch (c) {
+        // w to move forward.
+        case 'w':
+            keyBeingPressed.w = false;
+            break;
+        // s to move backward.
+        case 's':
+            keyBeingPressed.s = false;
+            break;
+
+        // a to straff left.
+        case 'a':
+            keyBeingPressed.a = false;
+            break;
+        // d to straff right.
+        case 'd':
+            keyBeingPressed.d = false;
+            break;
+
+        // Escape button to exit.
+        case 27:
+            exit(0);
+            break;
+    }
+}
+
+void keyboardToCamera() {
+    float dt = delta_time / 1000.0f;
+    if (keyBeingPressed.w)
+        camera.processKeyboard(Camera_Movement::FORWARD, dt);
+    if (keyBeingPressed.s)
+        camera.processKeyboard(Camera_Movement::BACKWARD, dt);
+    if (keyBeingPressed.a)
+        camera.processKeyboard(Camera_Movement::LEFT, dt);
+    if (keyBeingPressed.d)
+        camera.processKeyboard(Camera_Movement::RIGHT, dt);
+}
+
+void updateCamera() {
+    surface_program->use();
+    GLuint mv_loc = glGetUniformLocation(surface_program->id, "view_matrix");TEST_OPENGL_ERROR();
+    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &camera.view_matrix()[0][0]);TEST_OPENGL_ERROR();
+
+    GLuint cp_loc = glGetUniformLocation(surface_program->id, "cameraPos");TEST_OPENGL_ERROR();
+    glUniform3f(cp_loc, camera.position.x, camera.position.y, camera.position.z);TEST_OPENGL_ERROR();
+
+    obj_program->use();
+    mv_loc = glGetUniformLocation(obj_program->id, "view_matrix");TEST_OPENGL_ERROR();
+    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &camera.view_matrix()[0][0]);TEST_OPENGL_ERROR();
+
+    cp_loc = glGetUniformLocation(obj_program->id, "cameraPos");TEST_OPENGL_ERROR();
+    glUniform3f(cp_loc, camera.position.x, camera.position.y, camera.position.z);TEST_OPENGL_ERROR();
+
+    background_program->use();
+    mv_loc = glGetUniformLocation(background_program->id, "view_matrix");TEST_OPENGL_ERROR();
+    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &camera.view_matrix()[0][0]);TEST_OPENGL_ERROR();
+
+    cp_loc = glGetUniformLocation(background_program->id, "cameraPos");TEST_OPENGL_ERROR();
+    glUniform3f(cp_loc, camera.position.x, camera.position.y, camera.position.z);TEST_OPENGL_ERROR();
+}
+
+void timerFunc(int value) {
+    caustic_idx = (caustic_idx + 1) % CAUSTICS_SIZE;
+    glActiveTexture(GL_TEXTURE1);TEST_OPENGL_ERROR();
+    glBindTexture(GL_TEXTURE_2D, caustic_idx + caustic_begin);TEST_OPENGL_ERROR();
+    glutPostRedisplay();TEST_OPENGL_ERROR();
+    glutTimerFunc(timer, timerFunc, value);TEST_OPENGL_ERROR();
+}
+
 
 void display() {
+    int elapsed_time = glutGet(GLUT_ELAPSED_TIME);
+    delta_time = elapsed_time - last_time;
+    last_time = elapsed_time;
+
+    keyboardToCamera();
+    updateCamera();
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
-    main_program->use();
+
+    surface_program->use();
 
     floor_vao->draw();
 
@@ -146,131 +289,11 @@ void display() {
 
     background_vao->draw();
 
-    main_program->use();
+    surface_program->use();
 
     glutSwapBuffers();
 }
 
-void timerFunc(int value) {
-    caustic_idx = (caustic_idx + 1) % CAUSTICS_SIZE;
-    glActiveTexture(GL_TEXTURE1);TEST_OPENGL_ERROR();
-    glBindTexture(GL_TEXTURE_2D, caustic_idx + caustic_begin);TEST_OPENGL_ERROR();
-    glutPostRedisplay();TEST_OPENGL_ERROR();
-    glutTimerFunc(timer, timerFunc, value);TEST_OPENGL_ERROR();
-}
-
-void keyboardFunc(unsigned char c, int x, int y) {
-    switch (c) {
-        // W to move forward.
-        case 'w':
-            camera_pos += camera_front * camera_speed;
-            break;
-        // S to move backward.
-        case 's':
-            camera_pos -= camera_front * camera_speed;
-            break;
-
-        // A to straff left.
-        case 'a':
-            camera_pos -= glm::normalize(glm::cross(camera_front, camera_up)) * camera_speed;
-            break;
-        // d to straff right.
-        case 'd':
-            camera_pos += glm::normalize(glm::cross(camera_front, camera_up)) * camera_speed;
-            break;
-        case ' ':
-            camera_pos += glm::vec3(0.f, 1.f, 0.f) * camera_speed;
-            break;
-
-        // Escape button to exit.
-        case 27:
-            exit(0);
-            break;
-    }
-
-    glm::mat4 model_matrix = glm::mat4(1.0f);
-    glm::mat4 view_matrix = glm::lookAt(
-            camera_pos,
-            camera_pos + camera_front,
-            camera_up
-    );
-
-    main_program->use();
-    GLuint mv_loc = glGetUniformLocation(main_program->id, "view_matrix");TEST_OPENGL_ERROR();
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &view_matrix[0][0]);TEST_OPENGL_ERROR();
-
-    GLuint cp_loc = glGetUniformLocation(main_program->id, "cameraPos");TEST_OPENGL_ERROR();
-    glUniform3f(cp_loc, camera_pos.x, camera_pos.y, camera_pos.z);TEST_OPENGL_ERROR();
-
-    obj_program->use();
-    mv_loc = glGetUniformLocation(obj_program->id, "view_matrix");TEST_OPENGL_ERROR();
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &view_matrix[0][0]);TEST_OPENGL_ERROR();
-
-    cp_loc = glGetUniformLocation(obj_program->id, "cameraPos");TEST_OPENGL_ERROR();
-    glUniform3f(cp_loc, camera_pos.x, camera_pos.y, camera_pos.z);TEST_OPENGL_ERROR();
-
-    background_program->use();
-    mv_loc = glGetUniformLocation(background_program->id, "view_matrix");TEST_OPENGL_ERROR();
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &view_matrix[0][0]);TEST_OPENGL_ERROR();
-
-    cp_loc = glGetUniformLocation(background_program->id, "cameraPos");TEST_OPENGL_ERROR();
-    glUniform3f(cp_loc, camera_pos.x, camera_pos.y, camera_pos.z);TEST_OPENGL_ERROR();
-}
-
-void keyboardSpecialFunc(int c, int x, int y) {
-    switch (c) {
-        // Up key to rotate the camera upward.
-        case GLUT_KEY_UP:
-            camera_front = glm::rotate(camera_front, 0.03f, glm::cross(camera_front, glm::vec3(0.0f, 1.0f, 0.0f)));
-            break;
-        // Down key to rotate the camera downward.
-        case GLUT_KEY_DOWN:
-            camera_front = glm::rotate(camera_front, -0.03f, glm::cross(camera_front, glm::vec3(0.0f, 1.0f, 0.0f)));
-            break;
-
-        // Left key to rotate the camera to the left.
-        case GLUT_KEY_LEFT:
-            camera_front = glm::rotate(camera_front, 0.03f * camera_speed, glm::vec3(0.0f, 1.0f, 0.0f));
-            break;
-        // Right key to rotate the camera to the right.
-        case GLUT_KEY_RIGHT:
-            camera_front = glm::rotate(camera_front, -0.03f * camera_speed, glm::vec3(0.0f, 1.0f, 0.0f));
-            break;
-        case GLUT_KEY_CTRL_L:
-            camera_pos -= glm::vec3(0.f, 1.f, 0.f) * camera_speed;
-            break;
-    }
-
-    glm::mat4 view_matrix = glm::lookAt(
-            camera_pos,
-            camera_pos + camera_front,
-            camera_up
-    );
-
-    glm::mat4 model_view_matrix = view_matrix;
-
-    main_program->use();
-    GLuint mv_loc = glGetUniformLocation(main_program->id, "view_matrix");TEST_OPENGL_ERROR();
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &view_matrix[0][0]);TEST_OPENGL_ERROR();
-
-    GLuint cp_loc = glGetUniformLocation(main_program->id, "cameraPos");TEST_OPENGL_ERROR();
-    glUniform3f(cp_loc, camera_pos.x, camera_pos.y, camera_pos.z);TEST_OPENGL_ERROR();
-
-
-    obj_program->use();
-    mv_loc = glGetUniformLocation(obj_program->id, "view_matrix");TEST_OPENGL_ERROR();
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &view_matrix[0][0]);TEST_OPENGL_ERROR();
-
-    cp_loc = glGetUniformLocation(obj_program->id, "cameraPos");TEST_OPENGL_ERROR();
-    glUniform3f(cp_loc, camera_pos.x, camera_pos.y, camera_pos.z);TEST_OPENGL_ERROR();
-
-    background_program->use();
-    mv_loc = glGetUniformLocation(background_program->id, "model_view_matrix");TEST_OPENGL_ERROR();
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_view_matrix[0][0]);TEST_OPENGL_ERROR();
-
-    cp_loc = glGetUniformLocation(background_program->id, "cameraPos");TEST_OPENGL_ERROR();
-    glUniform3f(cp_loc, camera_pos.x, camera_pos.y, camera_pos.z);TEST_OPENGL_ERROR();
-}
 
 void init_glut(int &argc, char *argv[]) {
     glutInit(&argc, argv);
@@ -286,8 +309,12 @@ void init_glut(int &argc, char *argv[]) {
     glutReshapeFunc(window_resize);
 
     glutTimerFunc(0, timerFunc, 0);
-    glutKeyboardFunc(keyboardFunc);
-    glutSpecialFunc(keyboardSpecialFunc);
+
+    glutIgnoreKeyRepeat(1);
+    glutMotionFunc(motionFunctionCallback);
+    glutMouseFunc(mouseFunctionCallback);
+    glutKeyboardFunc(keyboardPressFunctionCallback);
+    glutKeyboardUpFunc(keyboardReleaseFunctionCallback);
 
     glutReportErrors();
 }
@@ -311,8 +338,8 @@ void init_GL() {
 }
 
 void init_object_vbo() {
-    GLint vertex_location = glGetAttribLocation(main_program->id, "position");TEST_OPENGL_ERROR();
-    GLint uv_location = glGetAttribLocation(main_program->id, "uv");TEST_OPENGL_ERROR();
+    GLint vertex_location = glGetAttribLocation(surface_program->id, "position");TEST_OPENGL_ERROR();
+    GLint uv_location = glGetAttribLocation(surface_program->id, "uv");TEST_OPENGL_ERROR();
 
     // Floor
     floor_vao = Vao::make_vao(vertex_location, floor_vbo, floor_texture_id, uv_location, uv_buffer_data);
@@ -385,7 +412,7 @@ void init_background_vao() {
 
 void init_uniform(GLuint program_id) {
     glm::mat4 projection_matrix = glm::perspective(
-            glm::radians(50.0f),
+            camera.fov_camera,
             16.f/9.f,
             5.f, 17500.0f
     );
@@ -394,21 +421,9 @@ void init_uniform(GLuint program_id) {
     glUniformMatrix4fv(mp_loc, 1, GL_FALSE, &projection_matrix[0][0]);TEST_OPENGL_ERROR();
 
     glm::mat4 model_matrix = glm::mat4(1.0f);
-    glm::mat4 view_matrix = glm::lookAt(
-            camera_pos,
-            camera_pos + camera_front,
-            camera_up
-    );
 
-    glm::mat4 model_view_matrix = view_matrix * model_matrix;
-
-    GLuint m_loc = glGetUniformLocation(program_id, "view_matrix");TEST_OPENGL_ERROR();
-    glUniformMatrix4fv(m_loc, 1, GL_FALSE, &view_matrix[0][0]);TEST_OPENGL_ERROR();
-    GLuint v_loc = glGetUniformLocation(program_id, "model_matrix");TEST_OPENGL_ERROR();
-    glUniformMatrix4fv(v_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-
-    GLuint cp_loc = glGetUniformLocation(program_id, "cameraPos");TEST_OPENGL_ERROR();
-    glUniform3f(cp_loc, camera_pos.x, camera_pos.y, camera_pos.z);TEST_OPENGL_ERROR();
+    GLuint m_loc = glGetUniformLocation(program_id, "model_matrix");TEST_OPENGL_ERROR();
+    glUniformMatrix4fv(m_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
 }
 
 void init_textures() {
@@ -432,7 +447,7 @@ void init_textures() {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, floor_texture);TEST_OPENGL_ERROR();
     glGenerateMipmap(GL_TEXTURE_2D);
 
-    tex_location = glGetUniformLocation(main_program->id, "floor_sampler");TEST_OPENGL_ERROR();
+    tex_location = glGetUniformLocation(surface_program->id, "floor_sampler");TEST_OPENGL_ERROR();
     glUniform1i(tex_location, 0);TEST_OPENGL_ERROR();
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);TEST_OPENGL_ERROR();
@@ -464,7 +479,7 @@ void init_textures() {
 
     glActiveTexture(GL_TEXTURE1);TEST_OPENGL_ERROR();
     glBindTexture(GL_TEXTURE_2D, caustic_idx + 1);TEST_OPENGL_ERROR();
-    tex_location = glGetUniformLocation(main_program->id, "caustic_sampler");TEST_OPENGL_ERROR();
+    tex_location = glGetUniformLocation(surface_program->id, "caustic_sampler");TEST_OPENGL_ERROR();
     glUniform1i(tex_location, 1);TEST_OPENGL_ERROR();
 
     unsigned char blue[3] = {0, 140, 179};
@@ -482,27 +497,31 @@ void init_textures() {
 }
 
 bool init_shaders() {
-    main_program = program::make_program("../src/vertex.vert", "../src/fragment.frag");
-    if (!main_program->is_ready()) {
-        std::cerr << "Main Program Creation Failed:" << main_program->get_log();
+    surface_program = program::make_program("../shaders/surface/surface.vert",
+                                            "../shaders/surface/surface.frag");
+    if (!surface_program->is_ready()) {
+        std::cerr << "Surface Program Creation Failed:" << surface_program->get_log();
         return false;
     }
 
-    background_program = program::make_program("../src/background.vert", "../src/background.frag");
+    background_program = program::make_program("../shaders/background/background.vert",
+                                               "../shaders/background/background.frag");
     if (!background_program->is_ready()) {
         std::cerr << "Background Program Creation Failed:\n" << background_program->get_log() << '\n';
         return false;
     }
 
-    obj_program = program::make_program("../src/vertex.vert", "../src/obj.frag");
+    obj_program = program::make_program("../shaders/object/object.vert",
+                                        "../shaders/object/object.frag");
     if (!obj_program->is_ready()) {
         std::cerr << "Obj Program Creation Failed:" << obj_program->get_log();
         return false;
     }
 
-    main_program->use();
+    surface_program->use();
     return true;
 }
+
 
 int main(int argc, char *argv[]) {
     init_glut(argc, argv);
@@ -515,7 +534,7 @@ int main(int argc, char *argv[]) {
 
     init_textures();
     init_object_vbo();
-    init_uniform(main_program->id);
+    init_uniform(surface_program->id);
 
     obj_program->use();
     init_uniform(obj_program->id);
@@ -533,7 +552,7 @@ int main(int argc, char *argv[]) {
     init_background_vao();
     init_uniform(background_program->id);
 
-    main_program->use();
+    surface_program->use();
 
     glutMainLoop();
 }

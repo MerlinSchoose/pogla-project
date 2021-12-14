@@ -8,3 +8,4 @@ Videos:
 Credits:
  - Assets: https://quaternius.com/
  - OBJ Loader: https://github.com/Bly7/OBJ-Loader
+ - Camera: https://www.learnopengl.com

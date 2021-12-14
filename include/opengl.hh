@@ -1,7 +1,3 @@
-//
-// Created by simon on 7/14/21.
-//
-
 #ifndef MAIN_OPENGL_HH
 #define MAIN_OPENGL_HH
 

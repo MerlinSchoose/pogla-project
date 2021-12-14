@@ -17,9 +17,10 @@ out vec2 vUv;
 void main() {
     gl_Position = projection_matrix * view_matrix * model_matrix * vec4(position, 1.0);
 
-    ray = position - cameraPos;
-    depth = position.y;
+    ray = (model_matrix * vec4(position, 1)).xyz - cameraPos;
+    depth = (model_matrix * vec4(position, 1)).y;
     cameraDepth = cameraPos.y;
-	//texture
+
+    //texture
     vUv = uv;
 }

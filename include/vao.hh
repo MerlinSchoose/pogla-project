@@ -1,16 +1,11 @@
-//
-// Created by simon on 7/15/21.
-//
-
 #ifndef MAIN_VAO_HH
 #define MAIN_VAO_HH
 
-#include "opengl.hh"
 #include <vector>
 
+#include "opengl.hh"
 
 class Vao {
-
 public:
     Vao() {
         id = 0;
@@ -32,6 +27,5 @@ public:
     GLuint texture_id = -1;
     bool using_indices = false;
 };
-
 
 #endif //MAIN_VAO_HH

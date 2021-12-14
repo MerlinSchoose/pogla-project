@@ -20,8 +20,7 @@ vec3 light_position = vec3(0.0, 0.0, 150.);
 
 layout(location=0) out vec4 output_color;
 
-vec3 refract(vec3 I, vec3 norm, float eta)
-{
+vec3 refract(vec3 I, vec3 norm, float eta) {
     float cos_init = dot(normalize(I), normalize(norm));
     if (cos_init < 0) {
         eta = 1 / eta;
@@ -41,7 +40,6 @@ float fog(float depth) {
 }
 
 void main() {
-
     float caustic_intensity = clamp(exp(.005 * depth), 0, 1);
     float fog_intensity = clamp(exp(.0045 * cameraDepth), 0, 1);
     float sun_intensity = clamp(exp(.03 * cameraDepth), 0, 1);
@@ -55,5 +53,4 @@ void main() {
     fog_color = mix(fog_color, surface_color, sun_intensity);
     fog_color = mix(fog_color, vec4(vec3(0), 1), 1 - darkness_intensity);
     output_color = mix(fog_color, output_color, fogv * fogv * fogv);
-
 }

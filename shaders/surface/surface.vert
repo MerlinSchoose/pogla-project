@@ -20,6 +20,7 @@ void main() {
     ray = (model_matrix * vec4(position, 1)).xyz - cameraPos;
     depth = (model_matrix * vec4(position, 1)).y;
     cameraDepth = cameraPos.y;
-	//texture
+
+	  //texture
     vUv = uv;
 }
