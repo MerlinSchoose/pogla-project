@@ -9,8 +9,6 @@ Object::Object(const std::vector<Object> &objects,
     vaos_ = vaos;
     vec_rot_ = vec_rot;
 
-    srand((unsigned) time(nullptr));
-
     float x_pos_range = max_pos.x - min_pos.x;
     float y_pos_range = max_pos.y - min_pos.y;
     float z_pos_range = max_pos.z - min_pos.z;

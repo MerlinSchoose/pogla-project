@@ -28,7 +28,7 @@ public:
 
     void draw(GLint mv_loc);
 
-private:
+protected:
     std::vector<Vao *> vaos_;
 
     glm::vec3 pos_;

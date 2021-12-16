@@ -1,3 +1,7 @@
+#include <vector>
+
+#include "opengl.hh"
+
 //Vertex List
 static const std::vector<GLfloat> floor_vbo {
         -5000.0, -50.0, 10.0,

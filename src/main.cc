@@ -1,14 +1,11 @@
 #include <iostream>
-#include <vector>
 #include <ctime>
 
-#include "opengl.hh"
 #include "object_vbo.hh"
 #include "image_io.hh"
-#include "shaders.hh"
 #include "obj_loader.hh"
 #include "camera.hh"
-#include "objects.hh"
+#include "boids.hh"
 
 #define CAUSTICS_SIZE 512
 
@@ -17,6 +14,8 @@ program *surface_program;
 program *background_program;
 program *obj_program;
 
+std::vector<program *> programs;
+
 // VAOS IDS
 Vao *floor_vao;
 Vao *surface_vao;
@@ -24,6 +23,7 @@ Vao *background_vao;
 
 // OBJECTS
 std::vector<Object> objects;
+std::vector<Boid> boids;
 
 // TEXTURES VARIABLES
 GLuint caustic_idx = 0;
@@ -40,17 +40,6 @@ Camera camera(glm::vec3(0.0f, -40.0f, 0.0f),
 int lastXMouse = 0;
 int lastYMouse = 0;
 bool firstMouse = true;
-
-int delta_time = 0;
-int last_time = 0;
-
-struct key_being_pressed {
-    bool w;
-    bool a;
-    bool d;
-    bool s;
-    bool shift;
-} keyBeingPressed;
 
 // GLUT HANDLING FUNCTIONS (CAMERA + TIMER)
 void window_resize(int width, int height) {
@@ -72,16 +61,7 @@ void motionFunctionCallback(int x, int y) {
 }
 
 void mouseFunctionCallback(int button, int state, int x, int y) {
-    // Wheel input reports as 3 (scroll up) and 4 (scroll down)
-    if (button == 3 || button == 4) {
-        if (state == GLUT_UP) return;
-        float offset = 1.f;
-        if (button == 3)
-            camera.processScroll(offset);
-        else
-            camera.processScroll(-offset);
-    }
-    else if (button == GLUT_LEFT_BUTTON || button == GLUT_RIGHT_BUTTON) {
+    if (button == GLUT_LEFT_BUTTON || button == GLUT_RIGHT_BUTTON) {
         if (state == GLUT_DOWN)
             firstMouse = true;
     }
@@ -91,113 +71,70 @@ void keyboardPressFunctionCallback(unsigned char c, int x, int y) {
     switch (c) {
         // w to move forward.
         case 'w':
-            keyBeingPressed.w = true;
+            camera.processKeyboard(Input_Keys::FORWARD, true);
             break;
         // s to move backward.
         case 's':
-            keyBeingPressed.s = true;
+            camera.processKeyboard(Input_Keys::BACKWARD, true);
             break;
 
         // a to straff left.
         case 'a':
-            keyBeingPressed.a = true;
+            camera.processKeyboard(Input_Keys::LEFT, true);
             break;
         // d to straff right.
         case 'd':
-            keyBeingPressed.d = true;
+            camera.processKeyboard(Input_Keys::RIGHT, true);
             break;
 
         // Escape button to exit.
         case 27:
             exit(0);
-            break;
+
+        default:
+            return;
     }
 }
 
 void keyboardSpecialPressFunctionCallback(int c, int x, int y) {
-    switch (c) {
-        // shift to move faster.
-        case GLUT_KEY_SHIFT_L:
-            camera.shift_pressed(true);
-            break;
-        case GLUT_KEY_SHIFT_R:
-            camera.shift_pressed(true);
-            break;
-    }
+    // shift to move faster.
+    if (c == GLUT_KEY_SHIFT_L || c == GLUT_KEY_SHIFT_R)
+        camera.processKeyboard(Input_Keys::SHIFT, true);
 }
 
 void keyboardReleaseFunctionCallback(unsigned char c, int x, int y) {
     switch (c) {
         // w to move forward.
         case 'w':
-            keyBeingPressed.w = false;
+            camera.processKeyboard(Input_Keys::FORWARD, false);
             break;
-        // s to move backward.
+            // s to move backward.
         case 's':
-            keyBeingPressed.s = false;
+            camera.processKeyboard(Input_Keys::BACKWARD, false);
             break;
 
-        // a to straff left.
+            // a to straff left.
         case 'a':
-            keyBeingPressed.a = false;
+            camera.processKeyboard(Input_Keys::LEFT, false);
             break;
-        // d to straff right.
+            // d to straff right.
         case 'd':
-            keyBeingPressed.d = false;
+            camera.processKeyboard(Input_Keys::RIGHT, false);
             break;
 
-        // Escape button to exit.
-        case 27:
-            exit(0);
-            break;
+        default:
+            return;
     }
 }
 
 void keyboardSpecialReleaseFunctionCallback(int c, int x, int y) {
-    switch (c) {
-        // shift to move faster.
-        case GLUT_KEY_SHIFT_L:
-            camera.shift_pressed(false);
-            break;
-        case GLUT_KEY_SHIFT_R:
-            camera.shift_pressed(false);
-            break;
-    }
-}
-
-void keyboardToCamera() {
-    float dt = delta_time / 1000.0f;
-    if (keyBeingPressed.w)
-        camera.processKeyboard(Camera_Movement::FORWARD, dt);
-    if (keyBeingPressed.s)
-        camera.processKeyboard(Camera_Movement::BACKWARD, dt);
-    if (keyBeingPressed.a)
-        camera.processKeyboard(Camera_Movement::LEFT, dt);
-    if (keyBeingPressed.d)
-        camera.processKeyboard(Camera_Movement::RIGHT, dt);
+    // shift to move faster.
+    if (c == GLUT_KEY_SHIFT_L || c == GLUT_KEY_SHIFT_R)
+        camera.processKeyboard(Input_Keys::SHIFT, false);
 }
 
 void updateCamera() {
-    surface_program->use();
-    GLuint mv_loc = glGetUniformLocation(surface_program->id, "view_matrix");TEST_OPENGL_ERROR();
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &camera.view_matrix()[0][0]);TEST_OPENGL_ERROR();
-
-    GLuint cp_loc = glGetUniformLocation(surface_program->id, "cameraPos");TEST_OPENGL_ERROR();
-    glUniform3f(cp_loc, camera.position.x, camera.position.y, camera.position.z);TEST_OPENGL_ERROR();
-
-    obj_program->use();
-    mv_loc = glGetUniformLocation(obj_program->id, "view_matrix");TEST_OPENGL_ERROR();
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &camera.view_matrix()[0][0]);TEST_OPENGL_ERROR();
-
-    cp_loc = glGetUniformLocation(obj_program->id, "cameraPos");TEST_OPENGL_ERROR();
-    glUniform3f(cp_loc, camera.position.x, camera.position.y, camera.position.z);TEST_OPENGL_ERROR();
-
-    background_program->use();
-    mv_loc = glGetUniformLocation(background_program->id, "view_matrix");TEST_OPENGL_ERROR();
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &camera.view_matrix()[0][0]);TEST_OPENGL_ERROR();
-
-    cp_loc = glGetUniformLocation(background_program->id, "cameraPos");TEST_OPENGL_ERROR();
-    glUniform3f(cp_loc, camera.position.x, camera.position.y, camera.position.z);TEST_OPENGL_ERROR();
+    camera.update_camera(programs, (float) glutGet(GLUT_ELAPSED_TIME));
 }
 
 void timerFunc(int value) {
@@ -215,101 +152,16 @@ void object_display() {
 
     GLint mv_loc = glGetUniformLocation(obj_program->id, "model_matrix");TEST_OPENGL_ERROR();
 
-    for (auto& obj : objects) {
+    for (auto& obj : objects)
         obj.draw(mv_loc);
-    }
 
-    /* GLuint mv_loc = glGetUniformLocation(obj_program->id, "model_matrix");TEST_OPENGL_ERROR();
-    auto model_matrix = glm::rotate(glm::translate(glm::vec3(-20.0f, -40.f, -40.f)), glm::radians(90.f), glm::vec3(0,1,0));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: fish_vaos) {
-        vao->draw();
+    for (auto &boid : boids) {
+        boid.move(.1f);
+        boid.draw(mv_loc);
     }
-
-    model_matrix = glm::rotate(glm::translate(glm::vec3(30.0f, -42.f, -45.f)), -glm::radians(60.f), glm::vec3(0,1,0));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: fish_vaos) {
-        vao->draw();
-    }
-
-    model_matrix = glm::rotate(glm::scale(glm::translate(glm::vec3(5.0f, -45.f, -60.f)), glm::vec3(.5f)),
-                               -glm::radians(60.f), glm::vec3(0,1,0));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: fish_2_vaos) {
-        vao->draw();
-    }
-
-    model_matrix = glm::rotate(glm::scale(glm::translate(glm::vec3(0.f, -792.f, 1050.f)), glm::vec3(4.f)),
-                               glm::radians(180.f), glm::vec3(0,1,0));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: fish_3_vaos) {
-        vao->draw();
-    }
-
-    model_matrix = glm::rotate(glm::scale(glm::translate(glm::vec3(0.f, -300.f, 600.f)), glm::vec3(7.f)),
-                               glm::radians(90.f), glm::vec3(0,1,0));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: fish_4_vaos) {
-        vao->draw();
-    }
-
-    model_matrix = glm::scale(glm::translate(glm::vec3(0.0f, -49.5f, -30.f)), glm::vec3(3.0f));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: rock_vaos) {
-        vao->draw();
-    }
-
-    model_matrix = glm::rotate(glm::scale(glm::translate(glm::vec3(10.0f, -49.5f, -50.f)), glm::vec3(2.5f)),
-                               glm::radians(90.f), glm::vec3(0, 1, 0));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: rock_vaos) {
-        vao->draw();
-    }
-
-    model_matrix = glm::scale(glm::translate(glm::vec3(-25.0f, -49.5f, -70.f)), glm::vec3(3.f));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: rock_vaos) {
-        vao->draw();
-    }
-
-    model_matrix = glm::scale(glm::translate(glm::vec3(15.0f, -49.5f, -30.f)), glm::vec3(10.0f));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: grass_vaos) {
-        vao->draw();
-    }
-
-    model_matrix = glm::scale(glm::translate(glm::vec3(-30.0f, -49.5f, -50.f)), glm::vec3(20.0f));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: grass_2_vaos) {
-        vao->draw();
-    }
-
-    model_matrix = glm::scale(glm::translate(glm::vec3(0.0f, -49.5f, -70.f)), glm::vec3(15.0f));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: grass_2_vaos) {
-        vao->draw();
-    }
-
-    model_matrix = glm::scale(glm::translate(glm::vec3(-15.0f, -49.5f, -55.f)), glm::vec3(20.0f));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: grass_3_vaos) {
-        vao->draw();
-    }
-
-    model_matrix = glm::scale(glm::translate(glm::vec3(30.0f, -49.5f, -45.f)), glm::vec3(17.0f));
-    glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
-    for (auto vao: grass_3_vaos) {
-        vao->draw();
-    }
-    */
 }
 
 void display() {
-    int elapsed_time = glutGet(GLUT_ELAPSED_TIME);
-    delta_time = elapsed_time - last_time;
-    last_time = elapsed_time;
-
-    keyboardToCamera();
     updateCamera();
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
@@ -447,20 +299,20 @@ void init_objects() {
     std::vector<Vao *> fish_vaos = init_obj_vao("../image_test/objs/Fish1.obj");
     std::vector<Vao *> fish_2_vaos = init_obj_vao("../image_test/objs/Fish2.obj");
     // std::vector<Vao *> fish_3_vaos = init_obj_vao("../image_test/objs/Manta ray.obj");
-    // std::vector<Vao *> fish_4_vaos = init_obj_vao("../image_test/objs/Shark.obj");
+    std::vector<Vao *> fish_4_vaos = init_obj_vao("../image_test/objs/Shark.obj");
     std::vector<Vao *> rock_vaos = init_obj_vao("../image_test/objs/Rock1.obj");
     std::vector<Vao *> grass_vaos = init_obj_vao("../image_test/objs/Grass1.obj");
     std::vector<Vao *> grass_2_vaos = init_obj_vao("../image_test/objs/Grass2.obj");
     std::vector<Vao *> grass_3_vaos = init_obj_vao("../image_test/objs/Grass3.obj");
 
     for (size_t i = 0; i < 100; ++i) {
-        objects.emplace_back(
-                Object(objects, fish_vaos,
-                       glm::vec3(-500.f, -49.5f, -500.f),
-                       glm::vec3(500.f, -5.f, 500.f),
-                       .5f, 2.f, 0.f, 180.f,
+        /* boids.emplace_back(
+                Boid(objects, fish_vaos,
+                       glm::vec3(-50.f, -49.5f, -50.f),
+                       glm::vec3(50.f, -5.f, 50.f),
+                       .1f, 1.f, 0.f, 180.f,
                        glm::vec3(0.f, 1.f, 0.f), 5.f
-                ));
+                ));*/
 
         objects.emplace_back(
                 Object(objects, fish_2_vaos,
@@ -502,6 +354,14 @@ void init_objects() {
                        glm::vec3(0.f, 1.f, 0.f), 1.f
                        ));
     }
+
+    boids.emplace_back(
+            Boid(objects, fish_vaos,
+                   glm::vec3(0.f, -49.5f, 0.f),
+                   glm::vec3(0.f, -5.f, 0.f),
+                   .1f, 1.f, 0.f, 180.f,
+                   glm::vec3(0.f, 1.f, 0.f), 5.f
+            ));
 }
 
 void init_background_vao() {
@@ -511,18 +371,14 @@ void init_background_vao() {
 }
 
 void init_uniform(GLuint program_id) {
-    glm::mat4 projection_matrix = glm::perspective(
-            camera.fov_camera,
-            16.f/9.f,
-            5.f, 17500.0f
-    );
+    glm::mat4 projection_matrix = camera.projection_matrix();
 
-    GLuint mp_loc = glGetUniformLocation(program_id, "projection_matrix");TEST_OPENGL_ERROR();
+    GLint mp_loc = glGetUniformLocation(program_id, "projection_matrix");TEST_OPENGL_ERROR();
     glUniformMatrix4fv(mp_loc, 1, GL_FALSE, &projection_matrix[0][0]);TEST_OPENGL_ERROR();
 
     glm::mat4 model_matrix = glm::mat4(1.0f);
 
-    GLuint m_loc = glGetUniformLocation(program_id, "model_matrix");TEST_OPENGL_ERROR();
+    GLint m_loc = glGetUniformLocation(program_id, "model_matrix");TEST_OPENGL_ERROR();
     glUniformMatrix4fv(m_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
 }
 
@@ -624,6 +480,10 @@ bool init_shaders() {
 
 // MAIN
 int main(int argc, char *argv[]) {
+    // Initialize random seed, based on exec time.
+    srand((unsigned) time(nullptr));
+
+    // Initialize glut and glew functions.
     init_glut(argc, argv);
     if (!init_glew())
         std::exit(1);
@@ -641,11 +501,14 @@ int main(int argc, char *argv[]) {
 
     init_objects();
 
-    // init_obj_positions();
-
     background_program->use();
     init_background_vao();
     init_uniform(background_program->id);
+
+    // Initialize programs vector.
+    programs.emplace_back(surface_program);
+    programs.emplace_back(obj_program);
+    programs.emplace_back(background_program);
 
     surface_program->use();
 

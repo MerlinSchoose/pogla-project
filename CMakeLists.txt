@@ -16,6 +16,7 @@ add_executable(main
         src/shaders.cc
         src/vao.cc
         src/camera.cc
-        src/objects.cc)
+        src/objects.cc
+        src/boids.cc)
 
 target_link_libraries( ${PROJECT_NAME} -lGLEW -lGL -lglut -lGLU)
