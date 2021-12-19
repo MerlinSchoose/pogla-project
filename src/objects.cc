@@ -34,13 +34,13 @@ Object::Object(const std::vector<Object> &objects,
                 is_valid = false;
         }
 
-        rot_ = ((float) rand() / (float) RAND_MAX) * rot_range + min_rot;
+        rot_ = glm::radians(((float) rand() / (float) RAND_MAX) * rot_range + min_rot);
     }
 }
 
 void Object::draw(GLint mv_loc) {
     auto model_matrix = glm::rotate(glm::scale(glm::translate(pos_), glm::vec3(scale_)),
-                               glm::radians(rot_), vec_rot_);
+                               rot_, vec_rot_);
     glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
     for (auto vao: vaos_) {
         vao->draw();

@@ -1,7 +1,6 @@
 #pragma once
 
 #include <utility>
-#include <vector>
 
 #include "vao.hh"
 
@@ -15,7 +14,7 @@ public:
             : vaos_(std::move(vaos)),
               pos_(pos),
               scale_(scale),
-              rot_(rot),
+              rot_(glm::radians(rot)),
               vec_rot_(vec_rot)
     { };
 

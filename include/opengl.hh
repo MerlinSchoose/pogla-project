@@ -7,6 +7,7 @@
 
 #include <glm/ext.hpp>
 #include <glm/gtx/rotate_vector.hpp>
+
 #include <iostream>
 
 #define TEST_OPENGL_ERROR()                                                             \
