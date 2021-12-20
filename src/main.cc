@@ -14,6 +14,8 @@ program *surface_program;
 program *background_program;
 program *obj_program;
 program *wave_program;
+program *caustic_program;
+program *depth_program;
 
 float anim_time = 0.0f;
 
@@ -103,6 +105,7 @@ void keyboardSpecialPressFunctionCallback(int c, int x, int y) {
     // shift to move faster.
     if (c == GLUT_KEY_SHIFT_L || c == GLUT_KEY_SHIFT_R)
         camera.processKeyboard(Input_Keys::SHIFT, true);
+    keyboardPressFunctionCallback(c, x, y);
 }
 
 void keyboardReleaseFunctionCallback(unsigned char c, int x, int y) {
@@ -134,6 +137,7 @@ void keyboardSpecialReleaseFunctionCallback(int c, int x, int y) {
     // shift to move faster.
     if (c == GLUT_KEY_SHIFT_L || c == GLUT_KEY_SHIFT_R)
         camera.processKeyboard(Input_Keys::SHIFT, false);
+    keyboardReleaseFunctionCallback(c, x, y);
 }
 
 void updateCamera() {
@@ -220,7 +224,7 @@ void init_glut(int &argc, char *argv[]) {
 
     glutTimerFunc(0, timerFunc, 0);
 
-    glutIgnoreKeyRepeat(1);
+    glutIgnoreKeyRepeat(0);
     glutMotionFunc(motionFunctionCallback);
     glutMouseFunc(mouseFunctionCallback);
     glutKeyboardFunc(keyboardPressFunctionCallback);
@@ -291,7 +295,7 @@ void init_surface_vao() {
     }
     GLint vertex_location = glGetAttribLocation(surface_program->id, "position");TEST_OPENGL_ERROR();
     GLint uv_location = glGetAttribLocation(surface_program->id, "uv");TEST_OPENGL_ERROR();
-    GLint normal_location = glGetAttribLocation(surface_program->id, "normals");TEST_OPENGL_ERROR();
+    GLint normal_location = glGetAttribLocation(surface_program->id, "normal");TEST_OPENGL_ERROR();
     surface_vao = Vao::make_vao(vertex_location, surface_vertices, blue_texture_id, uv_location, surface_uvs, surface_indices, normal_location, surface_normals);
 }
 
@@ -309,6 +313,7 @@ void init_object_vbo() {
 
 std::vector<Vao *> init_obj_vao(const char *filename) {
     GLint vertex_location = glGetAttribLocation(obj_program->id, "position");TEST_OPENGL_ERROR();
+    GLint normal_location = glGetAttribLocation(obj_program->id, "normal");TEST_OPENGL_ERROR();
     GLint uv_location = glGetAttribLocation(obj_program->id, "uv");TEST_OPENGL_ERROR();
     objl::Loader loader;
     bool is_loaded = loader.LoadFile(filename);
@@ -340,6 +345,7 @@ std::vector<Vao *> init_obj_vao(const char *filename) {
         }
 
         std::vector<GLfloat> vertices;
+        std::vector<GLfloat> normals;
         std::vector<GLfloat> uv;
         std::vector<GLuint> indices;
 
@@ -351,12 +357,15 @@ std::vector<Vao *> init_obj_vao(const char *filename) {
             vertices.push_back(vertex.Position.X);
             vertices.push_back(vertex.Position.Y);
             vertices.push_back(vertex.Position.Z);
+            normals.push_back(vertex.Normal.X);
+            normals.push_back(vertex.Normal.Y);
+            normals.push_back(vertex.Normal.Z);
 
             uv.push_back(vertex.Position.X);
             uv.push_back(vertex.Position.Z);
         }
 
-        obj_vaos.push_back(Vao::make_vao(vertex_location, vertices, texture_id, uv_location, uv, indices));
+        obj_vaos.push_back(Vao::make_vao(vertex_location, vertices, texture_id, uv_location, uv, indices, normal_location, normals));
     }
 
     glBindVertexArray(0);
@@ -455,6 +464,25 @@ void init_uniform(GLuint program_id) {
     glUniformMatrix4fv(m_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
 }
 
+
+void init_deferred_uniform(GLuint program_id) {
+    glm::mat4 projection_matrix = glm::perspective(45.f, 1.f, 20.f, 1000.f);
+
+    GLint mp_loc = glGetUniformLocation(program_id, "projection_matrix");TEST_OPENGL_ERROR();
+    glUniformMatrix4fv(mp_loc, 1, GL_FALSE, &projection_matrix[0][0]);TEST_OPENGL_ERROR();
+
+    glm::mat4 model_matrix = glm::mat4(1.0f);
+
+    GLint m_loc = glGetUniformLocation(program_id, "model_matrix");TEST_OPENGL_ERROR();
+    glUniformMatrix4fv(m_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
+
+    auto view_matrix = glm::lookAt(glm::vec3(0.f, 500.f, 0.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
+    GLint v_loc = glGetUniformLocation(program_id, "view_matrix");TEST_OPENGL_ERROR();
+    glUniformMatrix4fv(v_loc, 1, GL_FALSE, &view_matrix[0][0]);TEST_OPENGL_ERROR();
+
+    auto pos = glm::vec3(0.f, 500.f, 0.f);
+}
+
 void init_textures() {
     int width, height;
     auto *caustics_id = new GLuint[CAUSTICS_SIZE];
@@ -542,10 +570,14 @@ bool init_shaders() {
     wave_program->attach(*wave_shader);
     wave_program->link();
     delete wave_shader;
+
     if (!wave_program->is_ready()) {
         std::cerr << "Wave program Creation Failed:\n" << wave_program->get_log() << '\n';
         return false;
     }
+
+    caustic_program = program::make_program("../shaders/surface/surface.vert",
+                                            "../shaders/surface/surface.frag");
 
     background_program = program::make_program("../shaders/background/background.vert",
                                                "../shaders/background/background.frag");
