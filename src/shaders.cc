@@ -1,6 +1,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <memory>
 
 #include "string"
 #include "shaders.hh"
@@ -25,90 +26,25 @@ program::~program() {
 program *program::make_program(const char *vertex_shader_src, const char *fragment_shaders) {
     auto myprogram = new program;
 
-    GLuint vertex_shader = glCreateShader(GL_VERTEX_SHADER);TEST_OPENGL_ERROR();
-    GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);TEST_OPENGL_ERROR();
+    auto vertex_shader = std::shared_ptr<shader>(shader::make_shader(vertex_shader_src, GL_VERTEX_SHADER));
 
-    std::string vertex_shader_str;
-    std::ifstream vertex_shader_stream(vertex_shader_src, std::ios::in);
-    if(vertex_shader_stream.is_open()){
-        std::stringstream str_buffer;
-        str_buffer << vertex_shader_stream.rdbuf();
-        vertex_shader_str = str_buffer.str();
-        vertex_shader_stream.close();
-    }
-    else {
-        std::cout << "Cannot access " << vertex_shader_src << ": No such file or directory\n";
-        return myprogram;
-    }
-
-    std::string fragment_shader_str;
-    std::ifstream fragment_shader_stream(fragment_shaders, std::ios::in);
-    if(fragment_shader_stream.is_open()){
-        std::stringstream str_buffer;
-        str_buffer << fragment_shader_stream.rdbuf();
-        fragment_shader_str = str_buffer.str();
-        fragment_shader_stream.close();
-    }
-    else {
-        std::cout << "Cannot access " << fragment_shaders << ": No such file or directory\n";
-        return myprogram;
-    }
-
-    const char *vertex_shader_chars = vertex_shader_str.c_str();
-    const char *fragment_shader_chars = fragment_shader_str.c_str();
-
-    glShaderSource(vertex_shader, 1, &vertex_shader_chars, nullptr);TEST_OPENGL_ERROR();
-    glShaderSource(fragment_shader, 1, &fragment_shader_chars, nullptr);TEST_OPENGL_ERROR();
-
-    glCompileShader(vertex_shader);TEST_OPENGL_ERROR();
-
-    GLint vertex_compiled;
-    glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, &vertex_compiled);TEST_OPENGL_ERROR();
-    if (vertex_compiled != GL_TRUE)
+    if (!vertex_shader->is_ready())
     {
-        GLsizei log_length = 0;
-        auto *message = new GLchar[LOG_MAX_SIZE];
-        glGetShaderInfoLog(vertex_shader, LOG_MAX_SIZE, &log_length, message);TEST_OPENGL_ERROR();
-
-        myprogram->log_ = message;
+        myprogram->log_ = vertex_shader->get_log();
         return myprogram;
     }
+    auto fragment_shader = std::shared_ptr<shader>(shader::make_shader(fragment_shaders, GL_FRAGMENT_SHADER));
 
-    glCompileShader(fragment_shader);TEST_OPENGL_ERROR();
-
-    GLint fragment_compiled;
-    glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, &vertex_compiled);TEST_OPENGL_ERROR();
-    if (vertex_compiled != GL_TRUE)
+    if (!fragment_shader->is_ready())
     {
-        GLsizei log_length = 0;
-        auto *message = new GLchar[LOG_MAX_SIZE];
-        glGetShaderInfoLog(fragment_shader, LOG_MAX_SIZE, &log_length, message);TEST_OPENGL_ERROR();
-
-        myprogram->log_ = message;
+        myprogram->log_ = fragment_shader->get_log();
         return myprogram;
     }
 
-    glAttachShader(myprogram->id, vertex_shader);TEST_OPENGL_ERROR();
-    glAttachShader(myprogram->id, fragment_shader);TEST_OPENGL_ERROR();
+    myprogram->attach(*vertex_shader);
+    myprogram->attach(*fragment_shader);
 
-    glLinkProgram(myprogram->id);TEST_OPENGL_ERROR();
-
-    GLint program_linked;
-    glGetProgramiv(myprogram->id, GL_LINK_STATUS, &program_linked);TEST_OPENGL_ERROR();
-    if (program_linked != GL_TRUE)
-    {
-        GLsizei log_length = 0;
-        auto *message = new GLchar[LOG_MAX_SIZE];
-        glGetProgramInfoLog(myprogram->id, LOG_MAX_SIZE, &log_length, message);TEST_OPENGL_ERROR();
-
-        myprogram->log_ = message;
-        return myprogram;
-    }
-
-    glDeleteShader(vertex_shader);TEST_OPENGL_ERROR();
-    glDeleteShader(fragment_shader);TEST_OPENGL_ERROR();
-
-    myprogram->is_ready_ = true;
+    myprogram->link();
 
     return myprogram;
 }
@@ -123,4 +59,74 @@ bool program::is_ready() {
 
 void program::use() {
     glUseProgram(id);TEST_OPENGL_ERROR();
+}
+
+void program::attach(const shader &shd) {
+    glAttachShader(id, shd.id);TEST_OPENGL_ERROR();
+}
+
+void program::link() {
+    glLinkProgram(id);TEST_OPENGL_ERROR();
+
+    GLint program_linked;
+    glGetProgramiv(id, GL_LINK_STATUS, &program_linked);TEST_OPENGL_ERROR();
+    if (program_linked != GL_TRUE)
+    {
+        GLsizei log_length = 0;
+        auto *message = new GLchar[LOG_MAX_SIZE];
+        glGetProgramInfoLog(id, LOG_MAX_SIZE, &log_length, message);TEST_OPENGL_ERROR();
+
+        log_ = message;
+    }
+    else
+        is_ready_ = true;
+}
+
+shader::shader(GLuint type) {
+    id = glCreateShader(type);TEST_OPENGL_ERROR();
+}
+
+int shader::compile() {
+
+    glCompileShader(id);TEST_OPENGL_ERROR();
+
+    GLint compiled;
+    glGetShaderiv(id, GL_COMPILE_STATUS, &compiled);TEST_OPENGL_ERROR();
+    is_ready_ = compiled;
+    return compiled;
+}
+
+shader *shader::make_shader(const char *shader_file, GLuint type) {
+    auto res = new shader(type);
+    if (res->source(shader_file) != GL_TRUE) {
+        std::cout << "Cannot access " << shader_file << ": No such file or directory\n";
+        return res;
+    }
+    res->compile();
+    return res;
+}
+
+int shader::source(const char *shader_file) {
+    std::string shader_str;
+    std::ifstream shader_stream(shader_file, std::ios::in);
+    if(shader_stream.is_open()){
+        std::stringstream str_buffer;
+        str_buffer << shader_stream.rdbuf();
+        shader_str = str_buffer.str();
+        shader_stream.close();
+    }
+    else {
+        return GL_FALSE;
+    }
+
+    const char *shader_chars = shader_str.c_str();
+    glShaderSource(id, 1, &shader_chars, nullptr);TEST_OPENGL_ERROR();
+    return GL_TRUE;
+}
+
+char *shader::get_log() const {
+    GLsizei log_length = 0;
+    auto *message = new GLchar[LOG_MAX_SIZE];
+    glGetShaderInfoLog(id, LOG_MAX_SIZE, &log_length, message);TEST_OPENGL_ERROR();
+    return message;
 }

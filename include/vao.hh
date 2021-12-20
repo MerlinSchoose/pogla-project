@@ -23,7 +23,9 @@ public:
                          GLuint texture_id = -1,
                          GLuint uv_location = -1,
                          std::vector<GLfloat> uv = std::vector<GLfloat>(),
-                         std::vector<GLuint> indices = std::vector<GLuint>());
+                         std::vector<GLuint> indices = std::vector<GLuint>(),
+                         GLuint normal_location = -1,
+                         std::vector<GLfloat> normals = std::vector<GLfloat>());
 
     GLuint id;
     std::vector<GLuint> vbo_ids;

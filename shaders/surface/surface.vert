@@ -6,6 +6,7 @@ uniform mat4 projection_matrix;
 uniform vec3 cameraPos;
 
 in vec3 position;
+in vec3 normals;
 in vec2 uv;
 
 out float depth;
@@ -21,6 +22,6 @@ void main() {
     depth = (model_matrix * vec4(position, 1)).y;
     cameraDepth = cameraPos.y;
 
-	  //texture
+    //texture
     vUv = uv;
 }
