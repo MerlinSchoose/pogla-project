@@ -4,6 +4,7 @@ uniform sampler2D caustic_sampler;
 uniform sampler2D floor_sampler;
 
 in vec2 vUv;
+in vec3 vNormal;
 in float depth;
 in float cameraDepth;
 in vec3 ray;
