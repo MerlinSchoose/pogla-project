@@ -15,7 +15,7 @@ Vao *Vao::make_vao(GLuint vertex_location,
     if (vertex_location != -1) {
         vao->draw_size = vertices.size();
         glBindBuffer(GL_ARRAY_BUFFER, vao->vbo_ids[0]);TEST_OPENGL_ERROR();
-        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);TEST_OPENGL_ERROR();
+        glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_DYNAMIC_DRAW);TEST_OPENGL_ERROR();
         glVertexAttribPointer(vertex_location, 3, GL_FLOAT, GL_FALSE, 0, nullptr);TEST_OPENGL_ERROR();
         glEnableVertexAttribArray(vertex_location);TEST_OPENGL_ERROR();
     }

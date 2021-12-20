@@ -228,6 +228,47 @@ void init_GL() {
     glPixelStorei(GL_PACK_ALIGNMENT,1);
 }
 
+
+void init_surface_vao() {
+
+    int N = 500;
+    std::vector<GLfloat> surface_vertices;
+    std::vector<GLfloat> surface_uvs;
+    std::vector<GLuint> surface_indices;
+
+    float xmin = -5000;
+    float xmax = 5000;
+
+    for (int i = 0; i < N; i++) {
+        float a = i / (N - 1.f);
+        GLfloat x = (1 - a) * xmin + a * xmax;
+        for (int j = 0; j < N; j++) {
+            float b = j / (N - 1.f);
+            GLfloat y = (1 - b) * xmin + b * xmax;
+            surface_vertices.push_back(x);
+            surface_vertices.push_back(0.f);
+            surface_vertices.push_back(y);
+            surface_uvs.push_back(a);
+            surface_uvs.push_back(b);
+        }
+    }
+
+    for (int i = 0; i < N - 1; i++) {
+        for (int j = 0; j < N - 1; j++) {
+            int index = i * N + j;
+            surface_indices.push_back(index);
+            surface_indices.push_back(index + N);
+            surface_indices.push_back(index + N + 1);
+            surface_indices.push_back(index + N + 1);
+            surface_indices.push_back(index + 1);
+            surface_indices.push_back(index);
+        }
+    }
+    GLint vertex_location = glGetAttribLocation(surface_program->id, "position");TEST_OPENGL_ERROR();
+    GLint uv_location = glGetAttribLocation(surface_program->id, "uv");TEST_OPENGL_ERROR();
+    surface_vao = Vao::make_vao(vertex_location, surface_vertices, blue_texture_id, uv_location, surface_uvs, surface_indices);
+}
+
 void init_object_vbo() {
     GLint vertex_location = glGetAttribLocation(surface_program->id, "position");TEST_OPENGL_ERROR();
     GLint uv_location = glGetAttribLocation(surface_program->id, "uv");TEST_OPENGL_ERROR();
@@ -236,7 +277,8 @@ void init_object_vbo() {
     floor_vao = Vao::make_vao(vertex_location, floor_vbo, floor_texture_id, uv_location, uv_buffer_data);
 
     // Surface
-    surface_vao = Vao::make_vao(vertex_location, surface_vbo, blue_texture_id, uv_location, surface_uv_buffer_data);
+    init_surface_vao();
+
 }
 
 std::vector<Vao *> init_obj_vao(const char *filename) {
