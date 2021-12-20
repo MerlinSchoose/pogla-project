@@ -1,5 +1,38 @@
 #version 450
 
-void main() {
+layout (local_size_x = 1) in;
 
+uniform float anim_time;
+
+layout (std430, binding = 1) buffer position_buffer
+{
+    float pos[];
+};
+
+layout (std430, binding = 2) buffer normals_buffer
+{
+    float normals[];
+};
+
+float wave_height(float x, float z, float t) {
+    float h = 0.0f;
+    h += sin(t * 0.5 + x) * 5;
+    return h;
+
+}
+
+void main() {
+    uint index = gl_GlobalInvocationID.x * gl_NumWorkGroups.x + gl_GlobalInvocationID.y;
+    vec3 p = vec3(pos[3 * index], pos[3 * index + 1], pos[3 * index + 2]);
+    float e = 1e-3;
+    float h = wave_height(p.x, p.z, anim_time);
+    float h1 = wave_height(p.x + e, p.z, anim_time);
+    float h2 = wave_height(p.x, p.z + e, anim_time);
+    vec3 p1 = vec3(p.x + e, h1, p.z);
+    vec3 p2 = vec3(p.x, h2, p.z + e);
+    vec3 n = normalize(cross(p1 - p, p2 - p));
+    pos[3 * index + 1] = h;
+    normals[3 * index] = n.x;
+    normals[3 * index + 1] = n.y;
+    normals[3 * index + 2] = n.z;
 }

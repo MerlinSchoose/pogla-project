@@ -13,6 +13,9 @@
 program *surface_program;
 program *background_program;
 program *obj_program;
+program *wave_program;
+
+float anim_time = 0.0f;
 
 std::vector<program *> programs;
 
@@ -137,10 +140,22 @@ void updateCamera() {
     camera.update_camera(programs, (float) glutGet(GLUT_ELAPSED_TIME));
 }
 
+void animate_waves() {
+    GLint anim_time_location;
+    wave_program->use();
+    anim_time_location =
+            glGetUniformLocation(wave_program->id, "anim_time");
+    glUniform1f(anim_time_location, anim_time);
+    anim_time += 0.1;
+// testez une borne max.
+}
+
+
 void timerFunc(int value) {
     caustic_idx = (caustic_idx + 1) % CAUSTICS_SIZE;
     glActiveTexture(GL_TEXTURE1);TEST_OPENGL_ERROR();
     glBindTexture(GL_TEXTURE_2D, caustic_idx + caustic_begin);TEST_OPENGL_ERROR();
+    animate_waves();TEST_OPENGL_ERROR();
     glutPostRedisplay();TEST_OPENGL_ERROR();
     glutTimerFunc(timer, timerFunc, value);TEST_OPENGL_ERROR();
 }
@@ -165,6 +180,12 @@ void display() {
     updateCamera();
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
+
+    wave_program->use();
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, surface_vao->vbo_ids[0]);TEST_OPENGL_ERROR();
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, surface_vao->vbo_ids[2]);TEST_OPENGL_ERROR();
+    glDispatchCompute(500, 500, 1);TEST_OPENGL_ERROR();
+    glMemoryBarrier(GL_ALL_BARRIER_BITS);TEST_OPENGL_ERROR();
 
     surface_program->use();
 
@@ -235,6 +256,7 @@ void init_surface_vao() {
     std::vector<GLfloat> surface_vertices;
     std::vector<GLfloat> surface_uvs;
     std::vector<GLuint> surface_indices;
+    std::vector<GLfloat> surface_normals;
 
     float xmin = -5000;
     float xmax = 5000;
@@ -250,6 +272,9 @@ void init_surface_vao() {
             surface_vertices.push_back(y);
             surface_uvs.push_back(a);
             surface_uvs.push_back(b);
+            surface_normals.push_back(0.f);
+            surface_normals.push_back(1.f);
+            surface_normals.push_back(0.f);
         }
     }
 
@@ -266,7 +291,8 @@ void init_surface_vao() {
     }
     GLint vertex_location = glGetAttribLocation(surface_program->id, "position");TEST_OPENGL_ERROR();
     GLint uv_location = glGetAttribLocation(surface_program->id, "uv");TEST_OPENGL_ERROR();
-    surface_vao = Vao::make_vao(vertex_location, surface_vertices, blue_texture_id, uv_location, surface_uvs, surface_indices);
+    GLint normal_location = glGetAttribLocation(surface_program->id, "normals");TEST_OPENGL_ERROR();
+    surface_vao = Vao::make_vao(vertex_location, surface_vertices, blue_texture_id, uv_location, surface_uvs, surface_indices, normal_location, surface_normals);
 }
 
 void init_object_vbo() {
@@ -504,6 +530,20 @@ bool init_shaders() {
                                             "../shaders/surface/surface.frag");
     if (!surface_program->is_ready()) {
         std::cerr << "Surface Program Creation Failed:" << surface_program->get_log();
+        return false;
+    }
+
+    wave_program = new program;
+
+    auto wave_shader = shader::make_shader("../shaders/surface/wave.shd", GL_COMPUTE_SHADER);
+    if (!wave_shader->is_ready()) {
+        std::cerr << "Wave shader fail: " << wave_shader->get_log() << '\n';
+    }
+    wave_program->attach(*wave_shader);
+    wave_program->link();
+    delete wave_shader;
+    if (!wave_program->is_ready()) {
+        std::cerr << "Wave program Creation Failed:\n" << wave_program->get_log() << '\n';
         return false;
     }
 

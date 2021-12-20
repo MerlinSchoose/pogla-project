@@ -5,11 +5,14 @@ Vao *Vao::make_vao(GLuint vertex_location,
                    GLuint texture_id,
                    GLuint uv_location,
                    std::vector<GLfloat> uv,
-                   std::vector<GLuint> indices) {
+                   std::vector<GLuint> indices,
+                   GLuint normal_location,
+                   std::vector<GLfloat> normals) {
     auto vao = new Vao;
     glBindVertexArray(vao->id);TEST_OPENGL_ERROR();
     if (vertex_location != -1) vao->vbo_ids.push_back(-1);
-    if (vertex_location != -1) vao->vbo_ids.push_back(-1);
+    if (uv_location != -1) vao->vbo_ids.push_back(-1);
+    if (normal_location != -1) vao->vbo_ids.push_back(-1);
     glGenBuffers(vao->vbo_ids.size(), vao->vbo_ids.data());TEST_OPENGL_ERROR();
 
     if (vertex_location != -1) {
@@ -25,6 +28,13 @@ Vao *Vao::make_vao(GLuint vertex_location,
         glBufferData(GL_ARRAY_BUFFER, uv.size() * sizeof(float), uv.data(), GL_STATIC_DRAW);TEST_OPENGL_ERROR();
         glVertexAttribPointer(uv_location, 2, GL_FLOAT, GL_FALSE, 0, nullptr);TEST_OPENGL_ERROR();
         glEnableVertexAttribArray(uv_location);TEST_OPENGL_ERROR();
+    }
+
+    if (normal_location != -1) {
+        glBindBuffer(GL_ARRAY_BUFFER, vao->vbo_ids[2]);TEST_OPENGL_ERROR();
+        glBufferData(GL_ARRAY_BUFFER, normals.size() * sizeof(float), normals.data(), GL_DYNAMIC_DRAW);TEST_OPENGL_ERROR();
+        glVertexAttribPointer(normal_location, 3, GL_FLOAT, GL_FALSE, 0, nullptr);TEST_OPENGL_ERROR();
+        glEnableVertexAttribArray(normal_location);TEST_OPENGL_ERROR();
     }
 
     if (!indices.empty()) {
