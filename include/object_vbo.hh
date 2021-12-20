@@ -59,19 +59,18 @@ static const std::vector<GLfloat> surface_vbo {
         -5000.0, 0.0, 5000.0,
         5000.0, 0.0, 5000.0,
         -5000.0, 0.0, -5000.0,
-
-        -5000.0, 0.0, -5000.0,
-        5000.0, 0.0, 5000.0,
         5000.0, 0.0, -5000.0,
+};
+
+static const std::vector<GLuint> surface_vbo_indices {
+    0, 1, 2,
+    2, 1, 3,
 };
 
 static const std::vector<GLfloat> surface_uv_buffer_data {
         0.0, 1.0,
         1.0, 1.0,
         0.0, 0.0,
-
-        0.0, 0.0,
-        1.0, 1.0,
         1.0, 0.0,
 };
 
