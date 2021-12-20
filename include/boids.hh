@@ -7,17 +7,20 @@ public:
     Boid(const std::vector<Object> &objects,
          const std::vector<Vao *> &vaos,
          glm::vec3 min_pos, glm::vec3 max_pos,
-         float min_scale, float max_scale,
-         float min_rot, float max_rot,
-         glm::vec3 vec_rot, float size,
-         float min_speed, float max_speed)
+         float min_rot_x, float max_rot_x,
+         float min_rot_y, float max_rot_y,
+         float min_rot_z, float max_rot_z,
+         float min_speed, float max_speed,
+         float min_scale, float max_scale, float size)
             : Object(objects, vaos,
                      min_pos, max_pos,
-                     min_scale, max_scale,
-                     min_rot, max_rot,
-                     vec_rot, size) {
+                     min_rot_x, max_rot_x,
+                     min_rot_y, max_rot_y,
+                     min_rot_z, max_rot_z,
+                     min_scale, max_scale, size) {
         float speed = ((float) rand() / (float) RAND_MAX) * (max_speed - min_speed) + min_speed;
-        velocity_ = glm::vec3(sinf(rot_), 0.f, cosf(rot_)) * speed;
+
+        velocity_ = glm::vec3(rot_mat_ * glm::vec4(0.f, 0.f, 1.f, 1.f) * speed);
 
         acceleration_ = glm::vec3(0.f);
 

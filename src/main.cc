@@ -308,11 +308,13 @@ void init_objects() {
     for (size_t i = 0; i < 100; ++i) {
         boids.emplace_back(
                 Boid(objects, fish_vaos,
-                     glm::vec3(-100.f, -40.f, -100.f),
-                     glm::vec3(100.f, -40.f, 100.f),
-                     .1f, 1.f, 0.f, 360.f,
-                     glm::vec3(0.f, 1.f, 0.f), 5.f,
-                     1.f, 5.f
+                     glm::vec3(-50.f, -10.f, -50.f),
+                     glm::vec3(50.f, -40.f, 50.f),
+                     0.f, 45.f,
+                     0.f, 360.f,
+                     0.f, 0.f,
+                     1.f, 3.f,
+                     .1f, 1.f, 8.f
                 ));
     }
 
@@ -320,69 +322,52 @@ void init_objects() {
                 Object(objects, fish_2_vaos,
                        glm::vec3(-500.f, -49.5f, -500.f),
                        glm::vec3(500.f, -5.f, 500.f),
-                       .1f, 1.f, 0.f, 360.f,
-                       glm::vec3(0.f, 1.f, 0.f), 5.f
+                       0.f, 0.f,
+                       0.f, 360.f,
+                       0.f, 0.f,
+                       .1f, 1.f, 10.f
                 ));
 
         objects.emplace_back(
                 Object(objects, rock_vaos,
                        glm::vec3(-500.f, -49.5f, -500.f),
                        glm::vec3(500.f, -49.5f, 10.f),
-                       5.f, 10.f, 0.f, 360.f,
-                       glm::vec3(0.f, 1.f, 0.f), 5.f
+                       0.f, 0.f,
+                       0.f, 360.f,
+                       0.f, 0.f,
+                       1.f, 10.f, 4.f
                 ));
 
         objects.emplace_back(
                 Object(objects, grass_vaos,
                        glm::vec3(-500.f, -49.5f, -500.f),
                        glm::vec3(500.f, -49.5f, 10.f),
-                       15.f, 50.f, 0.f, 360.f,
-                       glm::vec3(0.f, 1.f, 0.f), 1.f
+                       0.f, 0.f,
+                       0.f, 360.f,
+                       0.f, 0.f,
+                       10.f, 50.f, .5f
                 ));
 
         objects.emplace_back(
                 Object(objects, grass_2_vaos,
                        glm::vec3(-500.f, -49.5f, -500.f),
                        glm::vec3(500.f, -49.5f, 10.f),
-                       15.f, 50.f, 0.f, 360.f,
-                       glm::vec3(0.f, 1.f, 0.f), 1.f
+                       0.f, 0.f,
+                       0.f, 360.f,
+                       0.f, 0.f,
+                       10.f, 50.f, .5f
                 ));
 
         objects.emplace_back(
                 Object(objects, grass_3_vaos,
                        glm::vec3(-500.f, -49.5f, -500.f),
                        glm::vec3(500.f, -49.5f, 10.f),
-                       15.f, 50.f, 0.f, 360.f,
-                       glm::vec3(0.f, 1.f, 0.f), 1.f
-                       ));
+                       0.f, 0.f,
+                       0.f, 360.f,
+                       0.f, 0.f,
+                       10.f, 50.f, .5f
+                ));
     } */
-
-    /* boids.emplace_back(
-            Boid(objects, fish_vaos,
-                 glm::vec3(-10.f, -40.f, -10.f),
-                 glm::vec3(-10.f, -40.f, -10.f),
-                 .5f, .5f, 90.f, 90.f,
-                 glm::vec3(0.f, 1.f, 0.f), 5.f,
-                 1.f, 1.f
-            ));
-
-    boids.emplace_back(
-            Boid(objects, fish_vaos,
-                 glm::vec3(0.f, -40.f, -10.f),
-                 glm::vec3(0.f, -40.f, -10.f),
-                 .5f, .5f, 180.f, 180.f,
-                 glm::vec3(0.f, 1.f, 0.f), 5.f,
-                 1.f, 1.f
-            ));
-
-    boids.emplace_back(
-            Boid(objects, fish_vaos,
-                 glm::vec3(10.f, -40.f, -5.f),
-                 glm::vec3(10.f, -40.f, -5.f),
-                 .5f, .5f, 270.f, 270.f,
-                 glm::vec3(0.f, 1.f, 0.f), 5.f,
-                 1.f, 1.f
-            )); */
 }
 
 void init_background_vao() {

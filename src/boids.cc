@@ -40,7 +40,6 @@ glm::vec3 Boid::cohesion_force(const std::vector<Boid>& neighbours) {
     if (!neighbours.empty()) {
         center = center / (float) (neighbours.size() + 1);
 
-        // cohesion_force = -velocity_;
         if (glm::length(center - pos_) > 0)
             cohesion_force += glm::normalize(center - pos_);
 
@@ -62,7 +61,6 @@ glm::vec3 Boid::separation_force(const std::vector<Boid>& neighbours) {
     if (!neighbours.empty()) {
         avg_dir = avg_dir / (float) neighbours.size();
 
-        // separation_force = -velocity_;
         if (glm::length(avg_dir) > 0)
             separation_force += glm::normalize(avg_dir);
 
@@ -107,7 +105,9 @@ void Boid::move(const std::vector<Boid>& boids, float elapsed_time) {
 
     pos_ += velocity_ * delta_time_;
 
-    rot_ = atan2f(velocity_.x, velocity_.z);
+    glm::mat4 rot_mat_xz = glm::rotate(atan2f(velocity_.x, velocity_.z), glm::vec3(0.f, 1.f, 0.f));
+    glm::mat4 rot_mat_y = glm::rotate(-asinf(velocity_.y), glm::vec3(1.f, 0.f, 0.f));
+    rot_mat_ = rot_mat_xz * rot_mat_y;
 
     acceleration_ = glm::vec3(0.f);
 }
