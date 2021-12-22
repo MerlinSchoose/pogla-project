@@ -46,6 +46,7 @@ int lastXMouse = 0;
 int lastYMouse = 0;
 bool firstMouse = true;
 
+
 // GLUT HANDLING FUNCTIONS (CAMERA + TIMER)
 void window_resize(int width, int height) {
     glViewport(0,0,width,height);TEST_OPENGL_ERROR();
@@ -145,15 +146,14 @@ void updateCamera() {
 }
 
 void animate_waves() {
+    // TODO: testez une borne max.
     GLint anim_time_location;
     wave_program->use();
     anim_time_location =
             glGetUniformLocation(wave_program->id, "anim_time");
     glUniform1f(anim_time_location, anim_time);
     anim_time += 0.1;
-// testez une borne max.
 }
-
 
 void timerFunc(int value) {
     caustic_idx = (caustic_idx + 1) % CAUSTICS_SIZE;
@@ -252,7 +252,6 @@ void init_GL() {
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
     glPixelStorei(GL_PACK_ALIGNMENT,1);
 }
-
 
 void init_surface_vao() {
 
@@ -385,8 +384,8 @@ void init_objects() {
     for (size_t i = 0; i < 100; ++i) {
         boids.emplace_back(
                 Boid(objects, fish_vaos,
-                     glm::vec3(-50.f, -10.f, -50.f),
-                     glm::vec3(50.f, -40.f, 50.f),
+                     glm::vec3(-100.f, -10.f, -100.f),
+                     glm::vec3(100.f, -40.f, 100.f),
                      0.f, 45.f,
                      0.f, 360.f,
                      0.f, 0.f,
@@ -394,14 +393,15 @@ void init_objects() {
                      .1f, 1.f, 8.f
                 ));
 
-        objects.emplace_back(
-                Object(objects, fish_2_vaos,
-                       glm::vec3(-500.f, -49.5f, -500.f),
-                       glm::vec3(500.f, -5.f, 500.f),
-                       0.f, 0.f,
-                       0.f, 360.f,
-                       0.f, 0.f,
-                       .1f, 1.f, 10.f
+        boids.emplace_back(
+                Boid(objects, fish_2_vaos,
+                     glm::vec3(-100.f, -10.f, -100.f),
+                     glm::vec3(100.f, -40.f, 100.f),
+                     0.f, 0.f,
+                     0.f, 360.f,
+                     0.f, 0.f,
+                     1.f, 3.f,
+                     .1f, 1.f, 10.f
                 ));
 
         objects.emplace_back(
@@ -463,7 +463,6 @@ void init_uniform(GLuint program_id) {
     GLint m_loc = glGetUniformLocation(program_id, "model_matrix");TEST_OPENGL_ERROR();
     glUniformMatrix4fv(m_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
 }
-
 
 void init_deferred_uniform(GLuint program_id) {
     glm::mat4 projection_matrix = glm::perspective(45.f, 1.f, 20.f, 1000.f);
@@ -596,6 +595,7 @@ bool init_shaders() {
     surface_program->use();
     return true;
 }
+
 
 // MAIN
 int main(int argc, char *argv[]) {
