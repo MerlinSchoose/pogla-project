@@ -73,7 +73,62 @@ glm::vec3 Boid::separation_force(const std::vector<Boid>& neighbours) {
     return separation_force;
 }
 
-void Boid::move(const std::vector<Boid>& boids, float elapsed_time) {
+glm::vec3 Boid::avoid_objects(const std::vector<Object>& objects) {
+    glm::vec3 avg_dir(0.f);
+    size_t count = 0;
+
+    for (auto& obj: objects) {
+        float distance = glm::distance(pos_, obj.pos_) - (obj.size_ / 2);
+        if (distance > perception_distance_)
+            continue;
+
+        avg_dir += ((pos_ - obj.pos_) / glm::distance(pos_, obj.pos_));
+        count++;
+    }
+
+    glm::vec3 avoid_force(0.f);
+    if (count > 0) {
+        avg_dir = avg_dir / (float) count;
+
+        if (glm::length(avg_dir) > 0)
+            avoid_force += glm::normalize(avg_dir);
+
+        // std::cout << "Avoidance: (" << avoid_force.x << ", " << avoid_force.y << ", " << avoid_force.z << ")\n";
+
+        if (glm::length(avoid_force) > max_steer_)
+            return glm::normalize(avoid_force) * max_steer_;
+    }
+
+    return avoid_force;
+}
+
+glm::vec3 Boid::restrict_boundaries() {
+    float y_dir = 0;
+    if (pos_.y > (-5.f - perception_distance_)) {
+        y_dir = (pos_.y / glm::distance(pos_.y, 0.f));
+    }
+
+    else if (pos_.y < (-50.f + perception_distance_) && pos_.z < 20.f) {
+        y_dir = -(pos_.y / glm::distance(pos_.y, -50.f));
+    }
+
+    glm::vec3 avoid_force(0.f);
+    if (y_dir != 0) {
+        avoid_force = glm::vec3(0.f, y_dir, 0.f);
+
+        if (velocity_.x < .001f && velocity_.z < .001f)
+            avoid_force.z += y_dir;
+
+        // std::cout << "Avoidance: (" << avoid_force.x << ", " << avoid_force.y << ", " << avoid_force.z << ")\n";
+
+        if (glm::length(avoid_force) > max_steer_)
+            return glm::normalize(avoid_force) * max_steer_;
+    }
+
+    return avoid_force;
+}
+
+void Boid::move(const std::vector<Boid>& boids, const std::vector<Object>& objects, float elapsed_time) {
     delta_time_ = (elapsed_time - last_time_) / 1000.f;
     last_time_ = elapsed_time;
 
@@ -89,6 +144,8 @@ void Boid::move(const std::vector<Boid>& boids, float elapsed_time) {
     acceleration_ += align_force(neighbours) * align_weight_;
     acceleration_ += cohesion_force(neighbours) * cohesion_weight_;
     acceleration_ += separation_force(neighbours) * separation_weight_;
+    acceleration_ += avoid_objects(objects) * avoid_weight_;
+    acceleration_ += restrict_boundaries() * restrict_weight_;
 
     velocity_ += acceleration_ * delta_time_;
 
@@ -105,8 +162,8 @@ void Boid::move(const std::vector<Boid>& boids, float elapsed_time) {
 
     pos_ += velocity_ * delta_time_;
 
-    glm::mat4 rot_mat_xz = glm::rotate(atan2f(velocity_.x, velocity_.z), glm::vec3(0.f, 1.f, 0.f));
-    glm::mat4 rot_mat_y = glm::rotate(-asinf(velocity_.y), glm::vec3(1.f, 0.f, 0.f));
+    glm::mat4 rot_mat_xz = glm::rotate(atan2f(dir.x, dir.z), glm::vec3(0.f, 1.f, 0.f));
+    glm::mat4 rot_mat_y = glm::rotate(-asinf(std::clamp(dir.y, -1.f, 1.f)), glm::vec3(1.f, 0.f, 0.f));
     rot_mat_ = rot_mat_xz * rot_mat_y;
 
     acceleration_ = glm::vec3(0.f);

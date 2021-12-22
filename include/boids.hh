@@ -28,7 +28,7 @@ public:
         prev_velocity_ = velocity_;
     }
 
-    void move(const std::vector<Boid>& boids, float elapsed_time);
+    void move(const std::vector<Boid>& boids, const std::vector<Object>& objects, float elapsed_time);
 
 private:
     std::vector<Boid> get_neighbours(const std::vector<Boid>& boids);
@@ -36,6 +36,8 @@ private:
     glm::vec3 align_force(const std::vector<Boid>& neighbours);
     glm::vec3 cohesion_force(const std::vector<Boid>& neighbours);
     glm::vec3 separation_force(const std::vector<Boid>& neighbours);
+    glm::vec3 avoid_objects(const std::vector<Object>& objects);
+    glm::vec3 restrict_boundaries();
 
     glm::vec3 velocity_;
     glm::vec3 acceleration_;
@@ -52,6 +54,8 @@ private:
     float align_weight_ = 1.f;
     float cohesion_weight_ = 1.f;
     float separation_weight_ = 1.f;
+    float avoid_weight_ = 1.f;
+    float restrict_weight_ = 1.f;
 
     float delta_time_ = 0.f;
     float last_time_ = 0.f;

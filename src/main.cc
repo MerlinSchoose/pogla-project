@@ -156,7 +156,7 @@ void object_display() {
         obj.draw(mv_loc);
 
     for (auto &boid : boids) {
-        boid.move(boids, (float) glutGet(GLUT_ELAPSED_TIME));
+        boid.move(boids, objects, (float) glutGet(GLUT_ELAPSED_TIME));
         boid.draw(mv_loc);
     }
 }
@@ -316,9 +316,8 @@ void init_objects() {
                      1.f, 3.f,
                      .1f, 1.f, 8.f
                 ));
-    }
 
-        /* objects.emplace_back(
+        objects.emplace_back(
                 Object(objects, fish_2_vaos,
                        glm::vec3(-500.f, -49.5f, -500.f),
                        glm::vec3(500.f, -5.f, 500.f),
@@ -335,7 +334,7 @@ void init_objects() {
                        0.f, 0.f,
                        0.f, 360.f,
                        0.f, 0.f,
-                       1.f, 10.f, 4.f
+                       1.f, 10.f, 5.f
                 ));
 
         objects.emplace_back(
@@ -367,7 +366,7 @@ void init_objects() {
                        0.f, 0.f,
                        10.f, 50.f, .5f
                 ));
-    } */
+    }
 }
 
 void init_background_vao() {

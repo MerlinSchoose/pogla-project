@@ -42,4 +42,6 @@ protected:
     glm::mat4 rot_mat_;
     float scale_;
     float size_;
+
+    friend class Boid;
 };
