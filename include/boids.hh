@@ -45,9 +45,9 @@ private:
     glm::vec3 prev_pos_;
     glm::vec3 prev_velocity_;
 
-    float min_speed_ = 1.f;
-    float max_speed_ = 3.f;
-    float max_steer_ = .5f;
+    float min_speed_ = 2.f;
+    float max_speed_ = 5.f;
+    float max_steer_ = 2.f;
 
     float perception_distance_ = 10.f;
 
@@ -55,7 +55,7 @@ private:
     float cohesion_weight_ = 1.f;
     float separation_weight_ = 1.f;
     float avoid_weight_ = 1.f;
-    float restrict_weight_ = 1.f;
+    float restrict_weight_ = 2.f;
 
     float delta_time_ = 0.f;
     float last_time_ = 0.f;
