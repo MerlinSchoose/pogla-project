@@ -1,6 +1,6 @@
 #version 450
 
-layout (local_size_x = 1) in;
+layout (local_size_x = 8, local_size_y = 8) in;
 
 uniform float anim_time;
 
@@ -47,12 +47,26 @@ float fresnel(vec3 I, vec3 norm, float eta) {
 
 float wave_height(float x, float z, float t) {
     float h = 0.0f;
-    h += sin(t * 0.5 + x) * 5;
+    vec2 p = vec2(x, z);
+    vec2 dir = vec2(1.0, 0);
+    float speed = 0.5;
+    float frequency = 0.1;
+    float A = 1.8;
+    float angle = 0.0;
+    for (int i = 0; i < 13; ++i) {
+        dir = vec2(cos(angle), sin(angle));
+        h += sin(t * speed + dot(dir, p) * frequency) * A;
+        //p += dir * cos(t * speed + dot(dir, p) * frequency) * A * 4;
+        speed *= 1.0;
+        frequency *= 1.2;
+        A *= 0.8;
+        angle += 12.0;
+    }
     return h;
 }
 
 void main() {
-    uint index = gl_GlobalInvocationID.x * gl_NumWorkGroups.x + gl_GlobalInvocationID.y;
+    uint index = gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x + gl_GlobalInvocationID.x;
     vec3 p = vec3(pos[3 * index], pos[3 * index + 1], pos[3 * index + 2]);
 
     float e = 1e-3;

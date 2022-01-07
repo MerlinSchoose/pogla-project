@@ -8,6 +8,7 @@
 #include "boids.hh"
 
 #define CAUSTICS_SIZE 512
+#define WAVE_SIZE 2048
 
 // PROGRAMS
 program *surface_program;
@@ -17,6 +18,7 @@ program *wave_program;
 program *caustic_program;
 program *depth_program;
 
+glm::vec4 *pixels = new glm::vec4[2048 * 2048];
 float anim_time = 0.0f;
 
 std::vector<program *> programs;
@@ -25,6 +27,8 @@ std::vector<program *> programs;
 Vao *floor_vao;
 Vao *surface_vao;
 Vao *background_vao;
+
+Object *floor_object;
 
 // OBJECTS
 std::vector<Object> objects;
@@ -37,6 +41,8 @@ GLuint timer = 1000 / 60;
 
 GLuint blue_texture_id;
 GLuint floor_texture_id;
+GLuint depth_texture_id;
+GLuint depth_framebuffer_id;
 
 // CAMERA VARIABLES
 Camera camera(glm::vec3(0.f, -40.f, 0.f),
@@ -166,37 +172,64 @@ void timerFunc(int value) {
 
 
 // DISPLAY FUNCTIONS
-void object_display() {
-    obj_program->use();
+void object_draw(GLuint program_id) {
 
-    GLint mv_loc = glGetUniformLocation(obj_program->id, "model_matrix");TEST_OPENGL_ERROR();
+    GLint mv_loc = glGetUniformLocation(program_id, "model_matrix");TEST_OPENGL_ERROR();
+    GLuint vert_loc = glGetUniformLocation(program_id, "position");TEST_OPENGL_ERROR();
+    GLuint uv_loc = glGetUniformLocation(program_id, "uv");TEST_OPENGL_ERROR();
+    GLuint normal_loc = glGetUniformLocation(program_id, "normal");TEST_OPENGL_ERROR();
 
     for (auto& obj : objects)
-        obj.draw(mv_loc);
+        obj.draw(mv_loc, vert_loc, uv_loc, normal_loc);
 
     for (auto &boid : boids) {
         boid.move(boids, objects, (float) glutGet(GLUT_ELAPSED_TIME));
-        boid.draw(mv_loc);
+        boid.draw(mv_loc, vert_loc, uv_loc, normal_loc);
     }
 }
 
 void display() {
     updateCamera();
 
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
+    glClampColor(GL_CLAMP_READ_COLOR, GL_FALSE);
 
     wave_program->use();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, surface_vao->vbo_ids[0]);TEST_OPENGL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, surface_vao->vbo_ids[2]);TEST_OPENGL_ERROR();
-    glDispatchCompute(500, 500, 1);TEST_OPENGL_ERROR();
+    glDispatchCompute((WAVE_SIZE + 7) / 8, (WAVE_SIZE + 7) / 8, 1);TEST_OPENGL_ERROR();
     glMemoryBarrier(GL_ALL_BARRIER_BITS);TEST_OPENGL_ERROR();
 
+    glBindFramebuffer(GL_FRAMEBUFFER, depth_framebuffer_id);
+    glViewport(0, 0, 2048, 2048);
+    depth_program->use();
+    GLuint vert_loc = glGetUniformLocation(depth_program->id, "position");TEST_OPENGL_ERROR();
+    GLint mv_loc = glGetUniformLocation(depth_program->id, "model_matrix");TEST_OPENGL_ERROR();
+    GLuint uv_loc = glGetUniformLocation(depth_program->id, "uv");TEST_OPENGL_ERROR();
+    GLuint normal_loc = glGetUniformLocation(depth_program->id, "normal");TEST_OPENGL_ERROR();
+    floor_object->draw(mv_loc, vert_loc, uv_loc, normal_loc);
+    object_draw(depth_program->id);
+
+    /*
+    glBindFramebuffer(GL_FRAMEBUFFER, );
+    glViewport(0, 0, 1920, 1080);
+    caustic_program->use();
+    vert_loc = glGetUniformLocation(caustic_program->id, "position");TEST_OPENGL_ERROR();
+    uv_loc = glGetUniformLocation(caustic_program->id, "uv");TEST_OPENGL_ERROR();
+    normal_loc = glGetUniformLocation(caustic_program->id, "normal");TEST_OPENGL_ERROR();
+    surface_vao->draw(vert_loc, uv_loc, normal_loc, depth_texture_id);
+
+    */
+    glViewport(0, 0, 1920, 1080);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     surface_program->use();
 
     floor_vao->draw();
     surface_vao->draw();
 
-    object_display();
+    obj_program->use();
+    object_draw(obj_program->id);
 
     background_program->use();
 
@@ -255,14 +288,14 @@ void init_GL() {
 
 void init_surface_vao() {
 
-    int N = 500;
+    int N = WAVE_SIZE;
     std::vector<GLfloat> surface_vertices;
     std::vector<GLfloat> surface_uvs;
     std::vector<GLuint> surface_indices;
     std::vector<GLfloat> surface_normals;
 
-    float xmin = -5000;
-    float xmax = 5000;
+    float xmin = -1000;
+    float xmax = 1000;
 
     for (int i = 0; i < N; i++) {
         float a = i / (N - 1.f);
@@ -304,6 +337,7 @@ void init_object_vbo() {
 
     // Floor
     floor_vao = Vao::make_vao(vertex_location, floor_vbo, floor_texture_id, uv_location, uv_buffer_data);
+    floor_object = new Object(std::vector<Vao *>(1, floor_vao), glm::vec3(0, 0, 0), 0, 0, 0, 1.f, 1.f);
 
     // Surface
     init_surface_vao();
@@ -465,21 +499,27 @@ void init_uniform(GLuint program_id) {
 }
 
 void init_deferred_uniform(GLuint program_id) {
-    glm::mat4 projection_matrix = glm::perspective(45.f, 1.f, 20.f, 1000.f);
+    glm::mat4 projection_matrix = glm::perspective(M_PI_2f32 * 1.f, 1.f, 400.f, 1000.f);
 
     GLint mp_loc = glGetUniformLocation(program_id, "projection_matrix");TEST_OPENGL_ERROR();
     glUniformMatrix4fv(mp_loc, 1, GL_FALSE, &projection_matrix[0][0]);TEST_OPENGL_ERROR();
+
+    auto pos = glm::vec3(0.f, 500.f, 0.f);
+    auto view_matrix = glm::lookAt(pos, glm::vec3(1.0f, -40.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
+    GLint v_loc = glGetUniformLocation(program_id, "view_matrix");TEST_OPENGL_ERROR();
+    glUniformMatrix4fv(v_loc, 1, GL_FALSE, &view_matrix[0][0]);TEST_OPENGL_ERROR();
+
 
     glm::mat4 model_matrix = glm::mat4(1.0f);
 
     GLint m_loc = glGetUniformLocation(program_id, "model_matrix");TEST_OPENGL_ERROR();
     glUniformMatrix4fv(m_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
 
-    auto view_matrix = glm::lookAt(glm::vec3(0.f, 500.f, 0.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
-    GLint v_loc = glGetUniformLocation(program_id, "view_matrix");TEST_OPENGL_ERROR();
-    glUniformMatrix4fv(v_loc, 1, GL_FALSE, &view_matrix[0][0]);TEST_OPENGL_ERROR();
+    GLint cp_loc = glGetUniformLocation(program_id, "cameraPos");TEST_OPENGL_ERROR();
+    glUniform3f(cp_loc, pos.x, pos.y, pos.z);TEST_OPENGL_ERROR();
 
-    auto pos = glm::vec3(0.f, 500.f, 0.f);
+    GLint tex_location = glGetUniformLocation(program_id, "depth_texture");TEST_OPENGL_ERROR();
+    glUniform1i(tex_location, 0);TEST_OPENGL_ERROR();
 }
 
 void init_textures() {
@@ -550,6 +590,20 @@ void init_textures() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);TEST_OPENGL_ERROR();
 
     delete[] caustics_id;
+
+    glGenFramebuffers(1, &depth_framebuffer_id);
+    glBindFramebuffer(GL_FRAMEBUFFER, depth_framebuffer_id);
+
+    glGenTextures(1, &depth_texture_id);TEST_OPENGL_ERROR();
+    glActiveTexture(GL_TEXTURE0);TEST_OPENGL_ERROR();
+    glBindTexture(GL_TEXTURE_2D, depth_texture_id);TEST_OPENGL_ERROR();
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, WAVE_SIZE, WAVE_SIZE, 0, GL_RGBA, GL_FLOAT,nullptr);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);TEST_OPENGL_ERROR();
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, depth_texture_id, 0);TEST_OPENGL_ERROR();
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);TEST_OPENGL_ERROR();
 }
 
 bool init_shaders() {
@@ -592,6 +646,22 @@ bool init_shaders() {
         return false;
     }
 
+    depth_program = program::make_program("../shaders/surface/depthmap.vert",
+                                          "../shaders/surface/depthmap.frag");
+
+    if (!depth_program->is_ready()) {
+        std::cerr << "Depth Program Creation Failed:" << depth_program->get_log();
+        return false;
+    }
+
+    caustic_program = program::make_program("../shaders/surface/caustic.vert",
+                                          "../shaders/surface/caustic.frag");
+
+    if (!caustic_program->is_ready()) {
+        std::cerr << "Caustic Program Creation Failed:" << caustic_program->get_log();
+        return false;
+    }
+
     surface_program->use();
     return true;
 }
@@ -623,6 +693,12 @@ int main(int argc, char *argv[]) {
     background_program->use();
     init_background_vao();
     init_uniform(background_program->id);
+
+    depth_program->use();
+    init_deferred_uniform(depth_program->id);
+
+    caustic_program->use();
+    init_deferred_uniform(caustic_program->id);
 
     // Initialize programs vector.
     programs.emplace_back(surface_program);

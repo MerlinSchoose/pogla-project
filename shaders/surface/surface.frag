@@ -65,7 +65,7 @@ void main() {
     float fog_intensity = clamp(exp(.0045 * cameraDepth), 0, 1);
     float darkness_intensity = clamp(exp(.0045 * cameraDepth), 0, 1);
 
-    output_color = clamp(texture(floor_sampler, vUv * 320) + vec4(vec3(texture(caustic_sampler, vUv * 160).r), 1) * caustic_intensity * 0.6, 0, 1);
+    output_color = clamp(texture(floor_sampler, vUv * 320) + vec4(vec3(texture(caustic_sampler, vUv * 32).r), 1) * caustic_intensity * 0.6, 0, 1);
     float sun = clamp(dot(normalize(ray), vec3(0, 1, 0)), 0, 1);
 
     float fogv = clamp((1000 * fog_intensity - length(ray)) / (1000 * fog_intensity - 10 * fog_intensity), 0, 1);
