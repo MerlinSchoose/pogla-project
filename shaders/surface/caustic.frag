@@ -4,16 +4,14 @@ uniform sampler2D depth_texture;
 uniform mat4 model_matrix;
 uniform mat4 view_matrix;
 uniform mat4 projection_matrix;
-in float depth;
-in vec3 newPos;
-in vec3 oldPos;
-in vec2 vUv;
+in vec3 intensity;
 
 layout(location=0) out vec4 output_color;
 
 void main() {
-    vec4 viewPos = (projection_matrix * view_matrix * vec4(oldPos, 1.0));
-    vec2 coord = (viewPos.xy / viewPos.w * 0.5 + 0.5) / (vec2(2048) / vec2(1920, 1080));
+
+    output_color = vec4(vec3(intensity), 1.0);
+    /*
     float oldArea = length(dFdx(oldPos)) * length(dFdy(oldPos));
     float newArea = length(dFdx(newPos)) * length(dFdy(newPos));
 
@@ -28,5 +26,6 @@ void main() {
     float causticsIntensity = ratio * 0.25;
 
 
-    output_color = vec4(causticsIntensity);
+    output_color = vec4(vec3(intensity), 1.0);
+    */
 }
