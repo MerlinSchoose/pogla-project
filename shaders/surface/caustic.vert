@@ -7,55 +7,62 @@ uniform mat4 view_matrix;
 uniform mat4 projection_matrix;
 uniform vec3 cameraPos;
 
+uniform mat4 model_matrix_light;
+uniform mat4 view_matrix_light;
+uniform mat4 projection_matrix_light;
+uniform vec3 lightPos;
+
 in vec3 position;
 in vec3 normal;
-in vec2 uv;
 
-out float depth;
 out vec3 newPos;
 out vec3 oldPos;
-out vec2 vUv;
 out vec3 color;
 
 vec2 toTex(vec4 vec) {
-    return (vec.xy / vec.w * 0.5 + 0.5);
+    return clamp(vec.xy / vec.w * 0.5 + 0.5, 0, 1);
 }
 
 void main() {
     //gl_Position = projection_matrix * view_matrix * model_matrix * vec4(position, 1.0);
-    vec4 screenPos = projection_matrix * view_matrix * model_matrix * vec4(position, 1.0);
+    mat4 mat = projection_matrix_light * view_matrix_light * model_matrix_light;
+    vec4 screenPos = projection_matrix_light * view_matrix_light * model_matrix_light * vec4(position, 1.0);
 
-    depth = (model_matrix * vec4(position, 1)).y;
+    ivec2 size = textureSize(depth_texture, 0);
 
-    vec3 worldPos = (model_matrix * vec4(position, 1.0)).xyz;
+    vec3 worldPos = (model_matrix_light * vec4(position, 1.0)).xyz;
     oldPos = worldPos;
 
-    vec3 refracted = normalize(refract(vec3(0, 1.0, 0), normal, 3/4f));
+    vec3 refracted = normalize(refract(vec3(0, -1.0, 0), normal, 4/3f));
 
-    vec4 clipRay = (projection_matrix * view_matrix * vec4(refracted, 1.0));
-    vec3 viewRefractedRay = clipRay.xyz;
-    //viewRefractedRay.z = -viewRefractedRay.z;
+    vec4 clipRay = (projection_matrix_light * view_matrix_light * model_matrix_light * vec4(lightPos + refracted - vec3(0, 1.1f, 0), 1.0));
+    vec3 viewRefractedRay = clipRay.xyz / clipRay.w;
+    viewRefractedRay.z = viewRefractedRay.z;
 
-    vec3 viewPos = screenPos.xyz;
-    vec2 coord = toTex(vec4(viewPos.xyz, screenPos.w));
+    vec3 viewPos = screenPos.xyz / screenPos.w;
+    viewPos.z = viewPos.z;
+    vec2 coord = toTex(vec4(screenPos));
 
     vec4 env = texture(depth_texture, coord.xy);
     newPos = env.xyz;
 
-    gl_Position = projection_matrix * view_matrix * vec4(vec3(oldPos.xyz), 1.0f);
-    color = (env.w <= viewPos.z ? 1.f : 0.f).xxx;
+    gl_Position = projection_matrix_light * view_matrix_light * vec4(vec3(oldPos.xyz), 1.0f);
+    color = 0.2f.xxx; // (env.w <= viewPos.z ? 1.f : 0.f).xxx;
 
     float zMax = 1.f;
     float zMin = 0.f;
     float z = 0.5;
     int i = 0;
-    for (; i < 4096; ++i) {
-        if (env.w <= viewPos.z)
+    float step = length(viewRefractedRay);
+    for (; i < 64; ++i) {
+        if (env.y > worldPos.y)
             break;
-        viewPos += viewRefractedRay / length(viewRefractedRay.xy) / 1024.f;
-        env = texture2D(depth_texture, toTex(vec4(viewPos.xyz, screenPos.w)));
+        worldPos += refracted * 1;
+        env = texture(depth_texture, toTex(mat * vec4(worldPos, 1.0f)));
     }
+    color = (env.w > viewPos.z ? 1.f : 0.f).xxx;
 
     newPos = env.xyz;
     gl_Position = projection_matrix * view_matrix * vec4(vec3(newPos), 1.0f);
+    //gl_Position = projection_matrix_light * view_matrix_light * vec4(vec3(newPos), 1.0f);
 }

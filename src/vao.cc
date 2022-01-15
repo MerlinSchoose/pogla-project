@@ -62,7 +62,7 @@ Vao *Vao::make_vao(GLint vertex_location,
     return vao;
 }
 
-void Vao::draw(GLint vertex_loc, GLint uv_loc, GLint normal_loc, GLuint tex) {
+void Vao::draw(GLint vertex_loc, GLint uv_loc, GLint normal_loc, GLint tex) {
     glBindVertexArray(id);TEST_OPENGL_ERROR();
 
     if (vertex_loc != -1) {
@@ -95,7 +95,6 @@ void Vao::draw(GLint vertex_loc, GLint uv_loc, GLint normal_loc, GLuint tex) {
         glVertexAttribPointer(this->norm_loc, 3, GL_FLOAT, GL_FALSE, 0, nullptr);TEST_OPENGL_ERROR();
         glEnableVertexAttribArray(this->norm_loc);TEST_OPENGL_ERROR();
     }
-    glBindBuffer(GL_ARRAY_BUFFER, 0);TEST_OPENGL_ERROR();
 
     if (tex != -1) {
         glActiveTexture(GL_TEXTURE0);TEST_OPENGL_ERROR();
@@ -103,6 +102,9 @@ void Vao::draw(GLint vertex_loc, GLint uv_loc, GLint normal_loc, GLuint tex) {
     } else if (texture_id != -1) {
         glActiveTexture(GL_TEXTURE0);TEST_OPENGL_ERROR();
         glBindTexture(GL_TEXTURE_2D, texture_id);TEST_OPENGL_ERROR();
+    } else {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, -1);TEST_OPENGL_ERROR();
     }
 
     if (using_indices) {

@@ -2,7 +2,10 @@
 
 layout( triangles ) in;
 
-layout( points, max_vertices=1) out;
+layout( points, max_vertices=3) out;
+
+uniform float zNear;
+uniform float zFar;
 
 in vec3 newPos[3];
 in vec3 oldPos[3];
@@ -11,14 +14,40 @@ in vec3 color[3];
 out vec3 intensity;
 
 void main() {
+    float attenuation = 0.3;
+    float zNear = 8.f;
+    float zFar = 2500.f;
     vec4 p = (gl_in[0].gl_Position + gl_in[1].gl_Position + gl_in[2].gl_Position) / 3.0;
     float oldArea = length(cross(oldPos[1] - oldPos[0], oldPos[2] - oldPos[0])) / 2.0;
     float newArea = length(cross(newPos[1] - newPos[0], newPos[2] - newPos[0])) / 2.0;
+    float smax = 80.f;
+    float smin = 5f;
+    float a = smax - zFar * (smax - smin) / (zFar - zNear);
+    float b = zNear * zFar * (smax - smin) / (zFar - zNear);
+    float s = a + b / (gl_in[0].gl_Position.z);
     gl_Position = gl_in[0].gl_Position;
-    gl_PointSize = 1f;
+    gl_PointSize = s;
+    if (gl_PointSize >= 1.f) {
+        intensity = (9.2 * exp(-attenuation * -newPos[0].y / 10.f)).xxx;
+        EmitVertex();
+    }
 
-    intensity = (oldArea / newArea).xxx * 0.4;
-    EmitVertex();
+    s = a + b / (gl_in[1].gl_Position.z);
+    gl_Position = gl_in[1].gl_Position;
+    gl_PointSize = s;
+    if (gl_PointSize >= 1.f) {
+        intensity = (9.2 * exp(-attenuation * -newPos[1].y / 10.f)).xxx;
+        EmitVertex();
+    }
+
+    s = a + b / (gl_in[2].gl_Position.z);
+    gl_Position = gl_in[2].gl_Position;
+    gl_PointSize = s;
+    if (gl_PointSize >= 1.f) {
+        intensity = (9.2 * exp(-attenuation * -newPos[2].y / 10.f)).xxx;
+        EmitVertex();
+    }
+
     /*
     gl_Position = gl_in[1].gl_Position;
     EmitVertex();

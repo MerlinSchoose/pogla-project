@@ -10,7 +10,7 @@ layout(location=0) out vec4 output_color;
 
 void main() {
 
-    output_color = vec4(vec3(intensity), 1.0);
+    output_color = vec4(vec3(intensity), 0.1f);
     /*
     float oldArea = length(dFdx(oldPos)) * length(dFdy(oldPos));
     float newArea = length(dFdx(newPos)) * length(dFdy(newPos));

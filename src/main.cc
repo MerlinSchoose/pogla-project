@@ -43,6 +43,8 @@ GLuint blue_texture_id;
 GLuint floor_texture_id;
 GLuint depth_texture_id;
 GLuint depth_framebuffer_id;
+GLuint caustic_texture_id;
+GLuint caustic_framebuffer_id;
 
 // CAMERA VARIABLES
 Camera camera(glm::vec3(0.f, -40.f, 0.f),
@@ -175,9 +177,9 @@ void timerFunc(int value) {
 void object_draw(GLuint program_id) {
 
     GLint mv_loc = glGetUniformLocation(program_id, "model_matrix");TEST_OPENGL_ERROR();
-    GLuint vert_loc = glGetAttribLocation(program_id, "position");TEST_OPENGL_ERROR();
-    GLuint uv_loc = glGetAttribLocation(program_id, "uv");TEST_OPENGL_ERROR();
-    GLuint normal_loc = glGetAttribLocation(program_id, "normal");TEST_OPENGL_ERROR();
+    GLint vert_loc = glGetAttribLocation(program_id, "position");TEST_OPENGL_ERROR();
+    GLint uv_loc = glGetAttribLocation(program_id, "uv");TEST_OPENGL_ERROR();
+    GLint normal_loc = glGetAttribLocation(program_id, "normal");TEST_OPENGL_ERROR();
 
     for (auto& obj : objects)
         obj.draw(mv_loc, vert_loc, uv_loc, normal_loc);
@@ -190,10 +192,11 @@ void object_draw(GLuint program_id) {
 
 void display() {
     updateCamera();
-    //glClearColor(0, 0, 0, 1);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glDisable(GL_BLEND);TEST_OPENGL_ERROR();
+    //glBlendFunc(GL_ONE, GL_ZERO);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
-    glClampColor(GL_CLAMP_READ_COLOR, GL_FALSE);
 
     wave_program->use();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, surface_vao->vbo_ids[0]);TEST_OPENGL_ERROR();
@@ -201,9 +204,17 @@ void display() {
     glDispatchCompute((WAVE_SIZE + 7) / 8, (WAVE_SIZE + 7) / 8, 1);TEST_OPENGL_ERROR();
     glMemoryBarrier(GL_ALL_BARRIER_BITS);TEST_OPENGL_ERROR();
 
-    glViewport(0, 0, WAVE_SIZE, WAVE_SIZE);TEST_OPENGL_ERROR();
+    //glClear(GL_COLOR_BUFFER_BIT);TEST_OPENGL_ERROR();
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, depth_texture_id);TEST_OPENGL_ERROR();
+    glClearTexImage(depth_texture_id, 0, GL_RGBA, GL_FLOAT, nullptr);TEST_OPENGL_ERROR();
     glBindFramebuffer(GL_FRAMEBUFFER, depth_framebuffer_id);TEST_OPENGL_ERROR();
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, depth_texture_id, 0);
+
     depth_program->use();
+
+
     GLint vert_loc = glGetAttribLocation(depth_program->id, "position");TEST_OPENGL_ERROR();
     GLint mv_loc = glGetUniformLocation(depth_program->id, "model_matrix");TEST_OPENGL_ERROR();
     GLint uv_loc = glGetAttribLocation(depth_program->id, "uv");TEST_OPENGL_ERROR();
@@ -211,21 +222,15 @@ void display() {
     floor_object->draw(mv_loc, vert_loc, uv_loc, normal_loc);
     object_draw(depth_program->id);
 
-    /*
-    glViewport(0, 0, 1920, 1080);
+    //glViewport(0, 0, 1920, 1080);
     //glViewport(0, 0, WAVE_SIZE, WAVE_SIZE);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    caustic_program->use();
-    vert_loc = glGetAttribLocation(caustic_program->id, "position");TEST_OPENGL_ERROR();
-    uv_loc = glGetAttribLocation(caustic_program->id, "uv");TEST_OPENGL_ERROR();
-    normal_loc = glGetAttribLocation(caustic_program->id, "normal");TEST_OPENGL_ERROR();
-    surface_vao->draw(vert_loc, uv_loc, normal_loc, depth_texture_id);
+    //glReadPixels(0, 0, WAVE_SIZE, WAVE_SIZE, GL_RGBA, GL_FLOAT, pixels);
 
-    glReadPixels(0, 0, WAVE_SIZE, WAVE_SIZE, GL_RGBA, GL_FLOAT, pixels);
-     */
-
-    glViewport(0, 0, 1920, 1080);
+    //glEnable(GL_ALPHA_TEST);TEST_OPENGL_ERROR();
+    glEnable(GL_BLEND);TEST_OPENGL_ERROR();
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glBlendFunc(GL_ONE, GL_ZERO);
     surface_program->use();
 
     floor_vao->draw();
@@ -238,6 +243,17 @@ void display() {
 
     background_vao->draw();
 
+    caustic_program->use();
+    glEnable(GL_PROGRAM_POINT_SIZE);TEST_OPENGL_ERROR();
+    //glPointSize(1.f);
+    //glPointParameterf(GL_POINT_DISTANCE_ATTENUATION, 2.f);TEST_OPENGL_ERROR();
+    //glEnable(GL_POLYGON_SMOOTH);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    vert_loc = glGetAttribLocation(caustic_program->id, "position");TEST_OPENGL_ERROR();
+    uv_loc = glGetAttribLocation(caustic_program->id, "uv");TEST_OPENGL_ERROR();
+    normal_loc = glGetAttribLocation(caustic_program->id, "normal");TEST_OPENGL_ERROR();
+    surface_vao->draw(vert_loc, uv_loc, normal_loc, depth_texture_id);
+
     surface_program->use();
 
     glutSwapBuffers();
@@ -247,7 +263,7 @@ void display() {
 // INIT FUNCTIONS
 void init_glut(int &argc, char *argv[]) {
     glutInit(&argc, argv);
-    glutInitContextVersion(4,6);
+    glutInitContextVersion(4,5);
     glutInitContextProfile(GLUT_CORE_PROFILE | GLUT_DEBUG);
     glutInitDisplayMode(GLUT_RGBA|GLUT_DOUBLE|GLUT_DEPTH);
 
@@ -283,9 +299,14 @@ bool init_glew() {
 
 void init_GL() {
     glEnable(GL_DEPTH_TEST);TEST_OPENGL_ERROR();
-    //glEnable(GL_BLEND);
+    //glEnable(GL_BLEND);TEST_OPENGL_ERROR();
+    //glBlendFunc(GL_SRC_ALPHA, GL_DST_ALPHA);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);TEST_OPENGL_ERROR();
-    glClearColor(0.0,0.35,0.75,1.0);TEST_OPENGL_ERROR();
+
+    glPointParameterf(GL_POINT_SIZE_MIN, 1.f);
+    glPointParameterf(GL_POINT_SIZE_MAX, 20.f);
+
+    glClearColor(0.0,0.0,0.0,0.0);TEST_OPENGL_ERROR();
     glPixelStorei(GL_UNPACK_ALIGNMENT,1);
     glPixelStorei(GL_PACK_ALIGNMENT,1);
 }
@@ -505,23 +526,25 @@ void init_uniform(GLuint program_id) {
 }
 
 void init_deferred_uniform(GLuint program_id) {
-    glm::mat4 projection_matrix = glm::perspective(M_PI_2f32 * 1.f, 1.f, 1.f, 1000.f);
+    float zNear = 1.f;
+    float zFar = 1000.f;
+    glm::mat4 projection_matrix = glm::perspective(M_PI_2f32 * 1.f, 1.f, 5.f, 1000.f);
 
-    GLint mp_loc = glGetUniformLocation(program_id, "projection_matrix");TEST_OPENGL_ERROR();
+    GLint mp_loc = glGetUniformLocation(program_id, "projection_matrix_light");TEST_OPENGL_ERROR();
     glUniformMatrix4fv(mp_loc, 1, GL_FALSE, &projection_matrix[0][0]);TEST_OPENGL_ERROR();
 
-    auto pos = glm::vec3(0.f, 500.f, 0.f);
+    auto pos = glm::vec3(0.f, 250.f, 0.f);
     auto view_matrix = glm::lookAt(pos, glm::vec3(0.1f, 20.f, 0.f), glm::vec3(0.f, 1.f, 0.f));
-    GLint v_loc = glGetUniformLocation(program_id, "view_matrix");TEST_OPENGL_ERROR();
+    GLint v_loc = glGetUniformLocation(program_id, "view_matrix_light");TEST_OPENGL_ERROR();
     glUniformMatrix4fv(v_loc, 1, GL_FALSE, &view_matrix[0][0]);TEST_OPENGL_ERROR();
 
 
     glm::mat4 model_matrix = glm::mat4(1.0f);
 
-    GLint m_loc = glGetUniformLocation(program_id, "model_matrix");TEST_OPENGL_ERROR();
+    GLint m_loc = glGetUniformLocation(program_id, "model_matrix_light");TEST_OPENGL_ERROR();
     glUniformMatrix4fv(m_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
 
-    GLint cp_loc = glGetUniformLocation(program_id, "cameraPos");TEST_OPENGL_ERROR();
+    GLint cp_loc = glGetUniformLocation(program_id, "lightPos");TEST_OPENGL_ERROR();
     glUniform3f(cp_loc, pos.x, pos.y, pos.z);TEST_OPENGL_ERROR();
 
     GLint tex_location = glGetUniformLocation(program_id, "depth_texture");TEST_OPENGL_ERROR();
@@ -566,9 +589,10 @@ void init_textures() {
         std::sprintf(filename, "../image_test/caustics_v3/CausticsRender_%03d.tga", i + 1);
         auto *caustic_texture = tifo::load_gray_image(filename, &width, &height)->get_buffer();
 
+        unsigned char black = 0;
         glActiveTexture(GL_TEXTURE1);TEST_OPENGL_ERROR();
         glBindTexture(GL_TEXTURE_2D, caustics_id[i]);TEST_OPENGL_ERROR();
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, caustic_texture);TEST_OPENGL_ERROR();
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 1, 1, 0, GL_RED, GL_UNSIGNED_BYTE, &black);TEST_OPENGL_ERROR();
         glGenerateMipmap(GL_TEXTURE_2D);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);TEST_OPENGL_ERROR();
@@ -590,8 +614,8 @@ void init_textures() {
     glActiveTexture(GL_TEXTURE0);TEST_OPENGL_ERROR();
     glBindTexture(GL_TEXTURE_2D, blue_texture_id);TEST_OPENGL_ERROR();
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, blue);TEST_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);TEST_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);TEST_OPENGL_ERROR();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);TEST_OPENGL_ERROR();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);TEST_OPENGL_ERROR();
 
@@ -603,12 +627,26 @@ void init_textures() {
     glGenTextures(1, &depth_texture_id);TEST_OPENGL_ERROR();
     glActiveTexture(GL_TEXTURE0);TEST_OPENGL_ERROR();
     glBindTexture(GL_TEXTURE_2D, depth_texture_id);TEST_OPENGL_ERROR();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, WAVE_SIZE, WAVE_SIZE, 0, GL_RGBA, GL_FLOAT,nullptr);TEST_OPENGL_ERROR();
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, 1920, 1080, 0, GL_RGBA, GL_FLOAT,nullptr);TEST_OPENGL_ERROR();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);TEST_OPENGL_ERROR();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);TEST_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);TEST_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);TEST_OPENGL_ERROR();
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, depth_texture_id, 0);TEST_OPENGL_ERROR();
+
+    glGenFramebuffers(1, &caustic_framebuffer_id);
+    glBindFramebuffer(GL_FRAMEBUFFER, caustic_framebuffer_id);
+
+    glGenTextures(1, &caustic_texture_id);TEST_OPENGL_ERROR();
+    glActiveTexture(GL_TEXTURE0);TEST_OPENGL_ERROR();
+    glBindTexture(GL_TEXTURE_2D, caustic_texture_id);TEST_OPENGL_ERROR();
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F_ARB, WAVE_SIZE, WAVE_SIZE, 0, GL_RGBA, GL_FLOAT,nullptr);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);TEST_OPENGL_ERROR();
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, caustic_texture_id, 0);TEST_OPENGL_ERROR();
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);TEST_OPENGL_ERROR();
 }
 
@@ -706,11 +744,13 @@ int main(int argc, char *argv[]) {
 
     caustic_program->use();
     init_deferred_uniform(caustic_program->id);
+    init_uniform(caustic_program->id);
 
     // Initialize programs vector.
     programs.emplace_back(surface_program);
     programs.emplace_back(obj_program);
     programs.emplace_back(background_program);
+    programs.emplace_back(caustic_program);
 
     surface_program->use();
 

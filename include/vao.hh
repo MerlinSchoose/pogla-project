@@ -16,7 +16,7 @@ public:
         glDeleteVertexArrays(1, &id);
     }
 
-    void draw(GLint vertex_loc = -1, GLint uv_loc = -1, GLint normal_loc = -1, GLuint texture_id = -1);
+    void draw(GLint vertex_loc = -1, GLint uv_loc = -1, GLint normal_loc = -1, GLint texture_id = -1);
 
     static Vao *make_vao(GLint vertex_location,
                          const std::vector<GLfloat>& vertices,

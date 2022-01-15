@@ -53,7 +53,7 @@ Object::Object(const std::vector<Object> &objects,
     );
 }
 
-void Object::draw(GLint mv_loc, GLuint vert_loc, GLuint uv_loc, GLuint normal_loc) {
+void Object::draw(GLint mv_loc, GLint vert_loc, GLint uv_loc, GLint normal_loc) {
     auto model_matrix = (
             glm::translate(pos_)
             * rot_mat_
