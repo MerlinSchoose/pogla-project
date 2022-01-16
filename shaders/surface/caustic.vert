@@ -20,7 +20,7 @@ out vec3 oldPos;
 out vec3 color;
 
 vec2 toTex(vec4 vec) {
-    return clamp(vec.xy / vec.w * 0.5 + 0.5, 0, 1);
+    return vec.xy / vec.w * 0.5 + 0.5;
 }
 
 void main() {
@@ -57,8 +57,12 @@ void main() {
     for (; i < 64; ++i) {
         if (env.y > worldPos.y)
             break;
-        worldPos += refracted * 1;
-        env = texture(depth_texture, toTex(mat * vec4(worldPos, 1.0f)));
+        worldPos += refracted * 8;
+        coord = toTex(mat * vec4(worldPos, 1.0f));
+        if (coord.x < 0 || coord.y < 0 || coord.x > 1 || coord.y > 1) {
+            break;
+        }
+        env = texture(depth_texture, coord);
     }
     color = (env.w > viewPos.z ? 1.f : 0.f).xxx;
 

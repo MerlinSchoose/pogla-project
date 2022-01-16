@@ -23,7 +23,7 @@ program::~program() {
     glDeleteProgram(id);TEST_OPENGL_ERROR();
 }
 
-program *program::make_program(const char *vertex_shader_src, const char *fragment_shader_src, const char *geometry_shader_src) {
+program *program::make_program(const char *vertex_shader_src, const char *fragment_shader_src, const char *geometry_shader_src, const char *tesscontrol_shader, const char *tesseval_shader) {
     auto myprogram = new program;
 
     auto vertex_shader = std::shared_ptr<shader>(shader::make_shader(vertex_shader_src, GL_VERTEX_SHADER));
@@ -41,6 +41,26 @@ program *program::make_program(const char *vertex_shader_src, const char *fragme
         return myprogram;
     }
 
+    if (tesscontrol_shader) {
+        auto tessc_shader = std::shared_ptr<shader>(shader::make_shader("../shaders/surface/caustic.tesscontrol", GL_TESS_CONTROL_SHADER));
+        if (!tessc_shader->is_ready())
+        {
+            myprogram->log_ = tessc_shader->get_log();
+            return myprogram;
+        }
+        myprogram->attach(*tessc_shader);
+    }
+
+    if (tesseval_shader) {
+        auto tesse_shader = std::shared_ptr<shader>(shader::make_shader("../shaders/surface/caustic.tesseval", GL_TESS_EVALUATION_SHADER));
+        if (!tesse_shader->is_ready())
+        {
+            myprogram->log_ = tesse_shader->get_log();
+            return myprogram;
+        }
+        myprogram->attach(*tesse_shader);
+    }
+
     if (geometry_shader_src) {
         auto geometry_shader = std::shared_ptr<shader>(shader::make_shader(geometry_shader_src, GL_GEOMETRY_SHADER));
 
@@ -51,6 +71,8 @@ program *program::make_program(const char *vertex_shader_src, const char *fragme
         }
         myprogram->attach(*geometry_shader);
     }
+
+
     myprogram->attach(*vertex_shader);
     myprogram->attach(*fragment_shader);
 

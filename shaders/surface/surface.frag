@@ -74,5 +74,5 @@ void main() {
     fog_color = mix(fog_color, vec4(vec3(0), 1), 1 - darkness_intensity);
     output_color = mix(fog_color, output_color, fogv * fogv * fogv);
     output_color = mix(output_color, vec4(1), pow(sun, 6 / sun_intensity));
-    output_color = vec4(output_color.xyz, 1.0);
+    output_color = vec4(output_color.xyz, z);
 }

@@ -10,7 +10,8 @@ layout(location=0) out vec4 output_color;
 
 void main() {
 
-    output_color = vec4(vec3(intensity), 0.1f);
+    float z = (2.0 * gl_FragCoord.z - gl_DepthRange.near - gl_DepthRange.far) / (gl_DepthRange.far - gl_DepthRange.near);
+    output_color = vec4(intensity.xxx, z);
     /*
     float oldArea = length(dFdx(oldPos)) * length(dFdy(oldPos));
     float newArea = length(dFdx(newPos)) * length(dFdy(newPos));

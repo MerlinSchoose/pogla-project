@@ -96,9 +96,10 @@ void Vao::draw(GLint vertex_loc, GLint uv_loc, GLint normal_loc, GLint tex) {
         glEnableVertexAttribArray(this->norm_loc);TEST_OPENGL_ERROR();
     }
 
-    if (tex != -1) {
+    if (tex != -1 && tex != -2) {
         glActiveTexture(GL_TEXTURE0);TEST_OPENGL_ERROR();
         glBindTexture(GL_TEXTURE_2D, tex);TEST_OPENGL_ERROR();
+    } else if (tex == -2) {
     } else if (texture_id != -1) {
         glActiveTexture(GL_TEXTURE0);TEST_OPENGL_ERROR();
         glBindTexture(GL_TEXTURE_2D, texture_id);TEST_OPENGL_ERROR();

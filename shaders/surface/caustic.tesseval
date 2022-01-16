@@ -1,0 +1,35 @@
+#version 450
+
+layout (triangles, equal_spacing, ccw) in;
+
+in vec3 newPosO[];
+in vec3 oldPosO[];
+in vec3 colorO[];
+
+out vec3 newPos;
+out vec3 oldPos;
+out vec3 color;
+
+void main() {
+    vec4 pos = vec4(0.0f);
+    pos += gl_TessCoord.x * gl_in[0].gl_Position;
+    pos += gl_TessCoord.y * gl_in[1].gl_Position;
+    pos += gl_TessCoord.z * gl_in[2].gl_Position;
+
+    newPos = vec3(0);
+    newPos += gl_TessCoord.x * newPosO[0];
+    newPos += gl_TessCoord.y * newPosO[1];
+    newPos += gl_TessCoord.z * newPosO[2];
+
+    oldPos = vec3(0);
+    oldPos += gl_TessCoord.x * oldPosO[0];
+    oldPos += gl_TessCoord.y * oldPosO[1];
+    oldPos += gl_TessCoord.z * oldPosO[2];
+
+    color = vec3(0);
+    color += gl_TessCoord.x * colorO[0];
+    color += gl_TessCoord.y * colorO[1];
+    color += gl_TessCoord.z * colorO[2];
+
+    gl_Position = pos;
+}

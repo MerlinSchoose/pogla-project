@@ -29,7 +29,7 @@ public:
     program();
     ~program();
 
-    static program *make_program(const char *vertex_shader_src, const char *fragment_shaders, const char *geometry_shader = nullptr);
+    static program *make_program(const char *vertex_shader_src, const char *fragment_shaders, const char *geometry_shader = nullptr, const char *tesscontrol_shader = nullptr, const char *tesseval_shader = nullptr);
     char *get_log();
     bool is_ready();
     void use();

@@ -13,6 +13,12 @@ in vec3 color[3];
 
 out vec3 intensity;
 
+float attenuation = 0.3;
+float amplification = 0.1;
+float caustic_intensity(vec3 pos) {
+    return amplification * exp(-attenuation * -pos.y / 30.f);
+}
+
 void main() {
     float attenuation = 0.3;
     float zNear = 8.f;
@@ -20,31 +26,33 @@ void main() {
     vec4 p = (gl_in[0].gl_Position + gl_in[1].gl_Position + gl_in[2].gl_Position) / 3.0;
     float oldArea = length(cross(oldPos[1] - oldPos[0], oldPos[2] - oldPos[0])) / 2.0;
     float newArea = length(cross(newPos[1] - newPos[0], newPos[2] - newPos[0])) / 2.0;
-    float smax = 80.f;
-    float smin = 5f;
+    float smax = 35.f;
+    float smin = 5.f;
     float a = smax - zFar * (smax - smin) / (zFar - zNear);
     float b = zNear * zFar * (smax - smin) / (zFar - zNear);
+
     float s = a + b / (gl_in[0].gl_Position.z);
     gl_Position = gl_in[0].gl_Position;
     gl_PointSize = s;
-    if (gl_PointSize >= 1.f) {
-        intensity = (9.2 * exp(-attenuation * -newPos[0].y / 10.f)).xxx;
+    if (gl_PointSize >= 1.f && color[0].x > 0) {
+        intensity = caustic_intensity(newPos[0]).xxx;
         EmitVertex();
     }
+    /*
 
     s = a + b / (gl_in[1].gl_Position.z);
     gl_Position = gl_in[1].gl_Position;
     gl_PointSize = s;
-    if (gl_PointSize >= 1.f) {
-        intensity = (9.2 * exp(-attenuation * -newPos[1].y / 10.f)).xxx;
+    if (gl_PointSize >= 1.f && color[1].x > 0) {
+        intensity = caustic_intensity(newPos[1]).xxx;
         EmitVertex();
     }
 
     s = a + b / (gl_in[2].gl_Position.z);
     gl_Position = gl_in[2].gl_Position;
     gl_PointSize = s;
-    if (gl_PointSize >= 1.f) {
-        intensity = (9.2 * exp(-attenuation * -newPos[2].y / 10.f)).xxx;
+    if (gl_PointSize >= 1.f && color[2].x > 0) {
+        intensity = caustic_intensity(newPos[2]).xxx;
         EmitVertex();
     }
 

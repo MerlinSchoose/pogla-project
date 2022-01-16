@@ -53,7 +53,7 @@ Object::Object(const std::vector<Object> &objects,
     );
 }
 
-void Object::draw(GLint mv_loc, GLint vert_loc, GLint uv_loc, GLint normal_loc) {
+void Object::draw(GLint mv_loc, GLint vert_loc, GLint uv_loc, GLint normal_loc, GLuint tex) {
     auto model_matrix = (
             glm::translate(pos_)
             * rot_mat_
@@ -62,6 +62,6 @@ void Object::draw(GLint mv_loc, GLint vert_loc, GLint uv_loc, GLint normal_loc) 
 
     glUniformMatrix4fv(mv_loc, 1, GL_FALSE, &model_matrix[0][0]);TEST_OPENGL_ERROR();
     for (auto vao: vaos_) {
-        vao->draw(vert_loc, uv_loc, normal_loc);
+        vao->draw(vert_loc, uv_loc, normal_loc, tex);
     }
 }

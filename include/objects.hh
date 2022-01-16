@@ -33,7 +33,7 @@ public:
            float min_rot_z, float max_rot_z,
            float min_scale, float max_scale, float size);
 
-    void draw(GLint mv_loc, GLint vert_loc = -1, GLint uv_loc = -1, GLint normal_loc = -1);
+    void draw(GLint mv_loc, GLint vert_loc = -1, GLint uv_loc = -1, GLint normal_loc = -1, GLuint tex = -1);
 
 protected:
     std::vector<Vao *> vaos_;
