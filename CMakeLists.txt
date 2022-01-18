@@ -17,6 +17,6 @@ add_executable(main
         src/vao.cc
         src/camera.cc
         src/objects.cc
-        src/boids.cc)
+        src/boids.cc src/program.cc)
 
 target_link_libraries( ${PROJECT_NAME} -lGLEW -lGL -lglut -lGLU)

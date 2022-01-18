@@ -49,7 +49,7 @@ private:
     float max_speed_ = 5.f;
     float max_steer_ = 2.f;
 
-    float perception_distance_ = 10.f;
+    float perception_distance_ = 20.f;
 
     float align_weight_ = 1.f;
     float cohesion_weight_ = 1.f;

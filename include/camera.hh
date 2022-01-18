@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 
 #include "shaders.hh"
+#include "program.hh"
 
 enum Input_Keys {
     FORWARD,

@@ -104,12 +104,12 @@ glm::vec3 Boid::avoid_objects(const std::vector<Object>& objects) {
 
 glm::vec3 Boid::restrict_boundaries() {
     float y_dir = 0;
-    if (pos_.y > (-2.f) * max_speed_) {
-        y_dir = (pos_.y / glm::distance(pos_.y, 0.f));
+    if (pos_.y > (-50.f)) {
+        y_dir = (pos_.y / glm::distance(pos_.y, -30.f));
     }
 
-    if (pos_.y < (-50.f + 2.f * max_speed_) && pos_.z < 30.f) {
-        y_dir = -(pos_.y / glm::distance(pos_.y, -50.f));
+    if (pos_.y < (-150.f + 2.f) && pos_.z < 30.f) {
+        y_dir = -(pos_.y / glm::distance(pos_.y, -150.f));
     }
 
     glm::vec3 avoid_force(0.f);

@@ -2,6 +2,7 @@
 
 in vec3 position;
 in vec3 normal;
+in vec2 uv;
 
 uniform mat4 model_matrix;
 uniform mat4 view_matrix;
@@ -13,6 +14,7 @@ out float depth;
 out float cameraDepth;
 out vec3 ray;
 
+out vec2 vUv;
 out vec3 vNormal;
 
 void main() {
@@ -22,5 +24,8 @@ void main() {
     depth = (model_matrix * vec4(position, 1)).y;
     cameraDepth = cameraPos.y;
 
-    vNormal = normalize(normal);
+    //texture
+    vUv = uv;
+
+    vNormal = normal;
 }

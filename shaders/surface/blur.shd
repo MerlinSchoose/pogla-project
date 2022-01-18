@@ -1,0 +1,40 @@
+#version 450
+
+layout (local_size_x = 8, local_size_y = 8) in;
+
+layout(binding = 0, rgba16f) uniform readonly image2DRect input_img;
+layout(binding = 1, rgba16f) uniform writeonly image2DRect out_img;
+
+const float PI = 3.141592653;
+
+float sigma = 3;
+
+float g(float x, float y) {
+    return (1 / (2 * PI * sigma)) * exp(-(x * x + y * y) / (sigma * sigma));
+}
+
+void main() {
+    int KERNEL_SIZE = 5;
+    ivec2 size = imageSize(input_img);
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    if (coord.x >= size.x || coord.y >= size.y) {
+        return;
+    }
+    vec4 color = imageLoad(input_img, coord);
+
+    vec3 accum = vec3(0);
+    float sum = 0;
+    for (int i = -KERNEL_SIZE/2; i <= KERNEL_SIZE/2; ++i) {
+        for (int j = -KERNEL_SIZE/2; j <= KERNEL_SIZE/2; ++j) {
+            ivec2 xy = coord + ivec2(i, j);
+            float k = g(i, j);
+            accum += k * imageLoad(input_img, xy).xyz;
+            sum += k;
+        }
+    }
+    vec3 res = accum / sum;
+
+    if (res.x > 0.0f)
+        imageStore(out_img, coord, vec4(res.xxx, color.w));
+
+}

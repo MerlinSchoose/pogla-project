@@ -1,0 +1,49 @@
+#version 450
+
+layout( triangles ) in;
+
+layout( line_strip, max_vertices=2) out;
+
+uniform float zNear;
+uniform float zFar;
+uniform vec3 cameraPos;
+
+in vec3 newPos[3];
+in vec3 oldPos[3];
+in vec4 clipPos[3];
+in vec3 color[3];
+
+out vec3 intensity;
+out vec3 pos;
+out vec3 ray;
+
+void main() {
+    if (color[0].x > 0) {
+        gl_PointSize = 5.f;
+        intensity = color[0];
+        ray = -(newPos[0] - oldPos[0]);
+        pos = newPos[0];
+        gl_Position = gl_in[0].gl_Position;
+        EmitVertex();
+        pos = oldPos[0];
+        gl_Position = clipPos[0];
+        //gl_Position = gl_in[1].gl_Position;
+        EmitVertex();
+    }
+    /*
+    if (color[0].x > 0) {
+        gl_Position = clipPos[0];
+        pos = oldPos[0];
+        EmitVertex();
+        pos = newPos[0];
+        gl_Position = gl_in[0].gl_Position;
+        EmitVertex();
+    }
+    if (color[2].x > 0) {
+        gl_Position = clipPos[2];
+        EmitVertex();
+        gl_Position = gl_in[2].gl_Position;
+        EmitVertex();
+    }
+    */
+}

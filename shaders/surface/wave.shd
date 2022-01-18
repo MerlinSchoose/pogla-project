@@ -12,48 +12,15 @@ layout (std430, binding = 2) buffer normals_buffer {
     float normals[];
 };
 
-vec3 refract(vec3 I, vec3 norm, float eta) {
-    float cos_init = dot(normalize(I), normalize(norm));
-    if (cos_init < 0) {
-        eta = 1 / eta;
-        cos_init = -cos_init;
-    }
-    else {
-        norm = -norm;
-    }
-
-    float k = 1 - eta * eta * (1 - cos_init * cos_init);
-
-    return eta * I + (eta * cos_init - sqrt(k)) * norm;
-}
-
-float fresnel(vec3 I, vec3 norm, float eta) {
-    float cos_init = dot(normalize(norm), normalize(I));
-    float sin_out;
-    if (cos_init > 0)
-    sin_out = sqrt(max(0., 1 - cos_init * cos_init)) * eta;
-    else {
-        sin_out = sqrt(max(0., 1 - cos_init * cos_init)) / eta;
-        cos_init = -cos_init;
-    }
-
-    if (sin_out >= 1) return 1;
-
-    float cos_out = sqrt(max(0., 1 - sin_out * sin_out));
-    float Rs = (eta * cos_init - cos_out) / (eta * cos_init + cos_out);
-    float Rp = (cos_init - eta * cos_out) / (cos_init + eta * cos_out);
-    return (Rs * Rs + Rp * Rp) / 2;
-}
-
 float wave_height(float x, float z, float t) {
     float h = 0.0f;
     vec2 p = vec2(x, z);
     vec2 dir = vec2(1.0, 0);
     float speed = 0.5;
-    float frequency = 0.1;
-    float A = 1.8;
+    float frequency = 0.05;
+    float A = 2.8;
     float angle = 0.0;
-    for (int i = 0; i < 13; ++i) {
+    for (int i = 0; i < 10; ++i) {
         dir = vec2(cos(angle), sin(angle));
         h += sin(t * speed + dot(dir, p) * frequency) * A;
         //p += dir * cos(t * speed + dot(dir, p) * frequency) * A * 4;
@@ -69,7 +36,7 @@ void main() {
     uint index = gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x + gl_GlobalInvocationID.x;
     vec3 p = vec3(pos[3 * index], pos[3 * index + 1], pos[3 * index + 2]);
 
-    float diff = 1e-4;
+    float diff = 2e-3;
 
     float h = wave_height(p.x, p.z, anim_time);
     float h1 = wave_height(p.x + diff, p.z, anim_time);

@@ -45,4 +45,7 @@ void main() {
     float fogv2 = clamp(exp(.0045 * cameraDepth), 0, 1);
     fog_color = mix(fog_color, surface_color, sun_intensity);
     output_color = mix(fog_color, vec4(vec3(0), 1), 1 - fogv2);
+
+    float z = (2.0 * gl_FragCoord.z - gl_DepthRange.near - gl_DepthRange.far) / (gl_DepthRange.far - gl_DepthRange.near);
+    output_color = vec4(output_color.xyz, z);
 }

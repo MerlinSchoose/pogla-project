@@ -94,6 +94,6 @@ glm::mat4 Camera::projection_matrix() const {
     return glm::perspective(
             fov_camera_,
             16.f/9.f,
-            1.f, 2500.0f
+            2.f, 3000.0f
     );
 }

@@ -103,9 +103,6 @@ void Vao::draw(GLint vertex_loc, GLint uv_loc, GLint normal_loc, GLint tex) {
     } else if (texture_id != -1) {
         glActiveTexture(GL_TEXTURE0);TEST_OPENGL_ERROR();
         glBindTexture(GL_TEXTURE_2D, texture_id);TEST_OPENGL_ERROR();
-    } else {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, -1);TEST_OPENGL_ERROR();
     }
 
     if (using_indices) {
