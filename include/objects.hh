@@ -18,6 +18,7 @@ public:
               scale_(scale),
               size_(size)
     {
+        // Builds an object with random rotation, but fixed position and scale
         rot_mat_ = (
                 glm::rotate(glm::mat4(1.f), glm::radians(rot_x), glm::vec3(1.f, 0.f, 0.f))
                 * glm::rotate(glm::mat4(1.f), glm::radians(rot_y), glm::vec3(0.f, 1.f, 0.f))

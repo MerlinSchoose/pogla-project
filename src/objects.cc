@@ -7,6 +7,7 @@ Object::Object(const std::vector<Object> &objects,
                const float min_rot_y, const float max_rot_y,
                const float min_rot_z, const float max_rot_z,
                const float min_scale, const float max_scale, const float size) {
+    // Object random initialisation (from ranges of values)
     vaos_ = vaos;
 
     const float x_pos_range = max_pos.x - min_pos.x;
@@ -18,7 +19,9 @@ Object::Object(const std::vector<Object> &objects,
     bool is_valid = false;
     glm::vec3 new_pos;
 
+    // Loop to try new positions, until a valid one is found (where there are no other objects)
     for (size_t j = 0; !is_valid && j < 100; ++j) {
+        // Random position and scale generation
         const float x_pos = ((float) rand() / (float) RAND_MAX) * x_pos_range + min_pos.x;
         const float y_pos = ((float) rand() / (float) RAND_MAX) * y_pos_range + min_pos.y;
         const float z_pos = ((float) rand() / (float) RAND_MAX) * z_pos_range + min_pos.z;
@@ -28,6 +31,7 @@ Object::Object(const std::vector<Object> &objects,
 
         pos_ = glm::vec3(x_pos, y_pos, z_pos);
 
+        // Test if an already existing object is too close
         is_valid = true;
         for (auto &obj: objects) {
             if (glm::distance(obj.pos_, pos_) < (size_ + obj.size_) / 2)
@@ -35,9 +39,11 @@ Object::Object(const std::vector<Object> &objects,
         }
     }
 
+    // If no positions where found in 100 tries, we consider that there is no room left to spawn a new object
     if (!is_valid)
         throw std::invalid_argument("An object could not spawn due to lack of space.");
 
+    // Random rotation matrix generation
     const float x_rot_range = max_rot_x - min_rot_x;
     const float y_rot_range = max_rot_y - min_rot_y;
     const float z_rot_range = max_rot_z - min_rot_z;
@@ -54,6 +60,7 @@ Object::Object(const std::vector<Object> &objects,
 }
 
 void Object::draw(GLint mv_loc, GLint vert_loc, GLint uv_loc, GLint normal_loc, GLuint tex) {
+    // Draw an object: builds a model matrix to translate, rotate and rescale the object
     auto model_matrix = (
             glm::translate(pos_)
             * rot_mat_

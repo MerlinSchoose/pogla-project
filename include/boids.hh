@@ -18,8 +18,10 @@ public:
                      min_rot_y, max_rot_y,
                      min_rot_z, max_rot_z,
                      min_scale, max_scale, size) {
+        // Creates new boid, with a random object creation and a random speed
         float speed = ((float) rand() / (float) RAND_MAX) * (max_speed - min_speed) + min_speed;
 
+        // Initial direction is computed from the rotation matrix of the object
         velocity_ = glm::vec3(rot_mat_ * glm::vec4(0.f, 0.f, 1.f, 1.f) * speed);
 
         acceleration_ = glm::vec3(0.f);
@@ -45,12 +47,15 @@ private:
     glm::vec3 prev_pos_;
     glm::vec3 prev_velocity_;
 
+    // Clamp values to prevent the boid to rotate too much or to go too fast or too slow
     float min_speed_ = 2.f;
     float max_speed_ = 5.f;
     float max_steer_ = 2.f;
 
+    // Perception radius of the boid (perception of its surrounding)
     float perception_distance_ = 20.f;
 
+    // Weights for the forces
     float align_weight_ = 1.f;
     float cohesion_weight_ = 1.f;
     float separation_weight_ = 1.f;

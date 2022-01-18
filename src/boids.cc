@@ -3,6 +3,7 @@
 #include "boids.hh"
 
 std::vector<Boid> Boid::get_neighbours(const std::vector<Boid>& boids) {
+    // Gets the neihbours of a boid, based on its perception distance
     std::vector<Boid> neighbours;
     for (auto& boid : boids) {
         if (boid.pos_ != pos_ && glm::distance(boid.pos_, pos_) < perception_distance_)
@@ -13,6 +14,7 @@ std::vector<Boid> Boid::get_neighbours(const std::vector<Boid>& boids) {
 }
 
 glm::vec3 Boid::align_force(const std::vector<Boid>& neighbours) {
+    // Computes the alignment force of a boid (mean of the velocities of its neighbours)
     glm::vec3 avg_dir = velocity_;
     for (auto& neighbour: neighbours)
         avg_dir += neighbour.prev_velocity_;
@@ -23,8 +25,6 @@ glm::vec3 Boid::align_force(const std::vector<Boid>& neighbours) {
     if (glm::length(avg_dir) > 0)
         align_force += glm::normalize(avg_dir);
 
-    // std::cout << "Align: (" << align_force.x << ", " << align_force.y << ", " << align_force.z << ")\n";
-
     if (glm::length(align_force) > max_steer_)
         return glm::normalize(align_force) * max_steer_;
 
@@ -32,6 +32,7 @@ glm::vec3 Boid::align_force(const std::vector<Boid>& neighbours) {
 }
 
 glm::vec3 Boid::cohesion_force(const std::vector<Boid>& neighbours) {
+    // Computes the cohesion force of a boid (towards center of mass of the boid and its neighbours)
     glm::vec3 center = pos_;
     for (auto& neighbour: neighbours)
         center += neighbour.prev_pos_;
@@ -43,8 +44,6 @@ glm::vec3 Boid::cohesion_force(const std::vector<Boid>& neighbours) {
         if (glm::length(center - pos_) > 0)
             cohesion_force += glm::normalize(center - pos_);
 
-        // std::cout << "Cohesion: (" << cohesion_force.x << ", " << cohesion_force.y << ", " << cohesion_force.z << ")\n";
-
         if (glm::length(cohesion_force) > max_steer_)
             return glm::normalize(cohesion_force) * max_steer_;
     }
@@ -53,6 +52,8 @@ glm::vec3 Boid::cohesion_force(const std::vector<Boid>& neighbours) {
 }
 
 glm::vec3 Boid::separation_force(const std::vector<Boid>& neighbours) {
+    // Computes the separation force of a boid (away from the mean positions of its neighbours, pondered by
+    // the distance)
     glm::vec3 avg_dir(0.f);
     for (auto& neighbour: neighbours)
         avg_dir += ((pos_ - neighbour.prev_pos_) / glm::distance(pos_, neighbour.prev_pos_));
@@ -64,8 +65,6 @@ glm::vec3 Boid::separation_force(const std::vector<Boid>& neighbours) {
         if (glm::length(avg_dir) > 0)
             separation_force += glm::normalize(avg_dir);
 
-        // std::cout << "Separation: (" << separation_force.x << ", " << separation_force.y << ", " << separation_force.z << ")\n";
-
         if (glm::length(separation_force) > max_steer_)
             return glm::normalize(separation_force) * max_steer_;
     }
@@ -74,6 +73,7 @@ glm::vec3 Boid::separation_force(const std::vector<Boid>& neighbours) {
 }
 
 glm::vec3 Boid::avoid_objects(const std::vector<Object>& objects) {
+    // Additional force to avoid the static objects of the scene
     glm::vec3 avg_dir(0.f);
     size_t count = 0;
 
@@ -103,6 +103,7 @@ glm::vec3 Boid::avoid_objects(const std::vector<Object>& objects) {
 }
 
 glm::vec3 Boid::restrict_boundaries() {
+    // Additional force to prevent the boids from going under the floor or above the sea level
     float y_dir = 0;
     if (pos_.y > (-50.f)) {
         y_dir = (pos_.y / glm::distance(pos_.y, -30.f));
@@ -129,18 +130,16 @@ glm::vec3 Boid::restrict_boundaries() {
 }
 
 void Boid::move(const std::vector<Boid>& boids, const std::vector<Object>& objects, float elapsed_time) {
+    // Compute elapsed time between to call to move(), to compensate a potential low frame rate
     delta_time_ = (elapsed_time - last_time_) / 1000.f;
     last_time_ = elapsed_time;
 
+    // Stores position and velocity before updating it, so that the other can still access the correct values
     prev_pos_ = pos_;
     prev_velocity_ = velocity_;
 
-    // std::cout << "Delta Time:" << delta_time_ << std::endl;
-    // std::cout << "Position: (" << pos_.x << ", " << pos_.y << ", " << pos_.z << ")\n";
-    // std::cout << "Velocity: (" << velocity_.x << ", " << velocity_.y << ", " << velocity_.z << ")\n";
-
+    // Apply forces
     auto neighbours = get_neighbours(boids);
-    // std::cout << "Neighbours: " << neighbours.size() << std::endl;
     acceleration_ += align_force(neighbours) * align_weight_;
     acceleration_ += cohesion_force(neighbours) * cohesion_weight_;
     acceleration_ += separation_force(neighbours) * separation_weight_;
@@ -149,19 +148,15 @@ void Boid::move(const std::vector<Boid>& boids, const std::vector<Object>& objec
 
     velocity_ += acceleration_ * delta_time_;
 
+    // Clamp the speed (velocity norm), to prevent the boids from going too fast or too slow
     float speed = glm::length(velocity_);
-    // std::cout << "Acceleration: (" << acceleration_.x << ", " << acceleration_.y << ", " << acceleration_.z << ")\n";
-    // std::cout << "Updated Velocity: (" << velocity_.x << ", " << velocity_.y << ", " << velocity_.z << ")\n";
-    // std::cout << "Speed: " << speed << std::endl;
     glm::vec3 dir = velocity_ / speed;
     speed = std::clamp(speed, min_speed_, max_speed_);
     velocity_ = dir * speed;
 
-    // std::cout << "Clamped Velocity: (" << velocity_.x << ", " << velocity_.y << ", " << velocity_.z << ")\n";
-    // std::cout << "Actual Speed: " << speed << std::endl << std::endl;
-
     pos_ += velocity_ * delta_time_;
 
+    // Update rotation matrix of the boid, based on the direction of its updated velocity
     glm::mat4 rot_mat_xz = glm::rotate(atan2f(dir.x, dir.z), glm::vec3(0.f, 1.f, 0.f));
     glm::mat4 rot_mat_y = glm::rotate(-asinf(std::clamp(dir.y, -1.f, 1.f)), glm::vec3(1.f, 0.f, 0.f));
     rot_mat_ = rot_mat_xz * rot_mat_y;
