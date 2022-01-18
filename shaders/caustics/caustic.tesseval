@@ -2,6 +2,8 @@
 
 layout (triangles, equal_spacing, ccw) in;
 
+// Shader inutilisé pour cause de "INVALID ARGUMENT" sans plus d'explications dans le draw.
+
 in vec3 newPosO[];
 in vec3 oldPosO[];
 in vec3 colorO[];

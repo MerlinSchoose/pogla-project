@@ -2,6 +2,8 @@
 
 layout(vertices = 3) out;
 
+// Shader inutilisé pour cause de "INVALID ARGUMENT" sans plus d'explications dans le draw.
+
 in vec3 newPos[];
 in vec3 oldPos[];
 in vec3 color[];

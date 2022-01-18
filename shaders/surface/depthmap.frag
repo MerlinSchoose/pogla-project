@@ -6,6 +6,6 @@ layout(location=0) out vec4 output_color;
 
 void main() {
 
-    //float z = (2.0 * gl_FragCoord.z - gl_DepthRange.near - gl_DepthRange.far) / (gl_DepthRange.far - gl_DepthRange.near);
-    output_color = vec4(vPos.xyz / vPos.w, depth);
+    // depth inutile au final car on utilise les world coordinates
+    output_color = vec4(vPos.xyz, depth);
 }

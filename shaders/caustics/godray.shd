@@ -4,9 +4,7 @@ layout( triangles ) in;
 
 layout( line_strip, max_vertices=2) out;
 
-uniform float zNear;
-uniform float zFar;
-uniform vec3 cameraPos;
+// Geometry shader pour transformer les triangles en lignes.
 
 in vec3 newPos[3];
 in vec3 oldPos[3];
@@ -18,8 +16,9 @@ out vec3 pos;
 out vec3 ray;
 
 void main() {
+    // Test de validite du point.
     if (color[0].x > 0) {
-        gl_PointSize = 5.f;
+        // On fait une ligne entre la position d'origine et d'arrivee, avec sa world position et le vecteur du rayon.
         intensity = color[0];
         ray = -(newPos[0] - oldPos[0]);
         pos = newPos[0];
@@ -27,23 +26,7 @@ void main() {
         EmitVertex();
         pos = oldPos[0];
         gl_Position = clipPos[0];
-        //gl_Position = gl_in[1].gl_Position;
         EmitVertex();
     }
-    /*
-    if (color[0].x > 0) {
-        gl_Position = clipPos[0];
-        pos = oldPos[0];
-        EmitVertex();
-        pos = newPos[0];
-        gl_Position = gl_in[0].gl_Position;
-        EmitVertex();
-    }
-    if (color[2].x > 0) {
-        gl_Position = clipPos[2];
-        EmitVertex();
-        gl_Position = gl_in[2].gl_Position;
-        EmitVertex();
-    }
-    */
+    // Meme si on rate des vertex en ne prenant que le premier, le rendu est correct et les performances sont trois fois meilleures.
 }

@@ -9,7 +9,7 @@
 #include "program.hh"
 
 #define CAUSTICS_SIZE 512
-#define WAVE_SIZE 2048
+#define WAVE_SIZE 1024
 
 // PROGRAMS
 program *surface_program;
@@ -22,10 +22,6 @@ program *combine_program;
 program *floor_program;
 program *blur_program;
 program *godray_program;
-
-glm::vec4 *pixels = new glm::vec4[1920*1080];
-glm::vec4 *pixels2 = new glm::vec4[1920*1080];
-float anim_time = 0.0f;
 
 std::vector<program *> programs;
 
@@ -41,8 +37,6 @@ std::vector<Object> objects;
 std::vector<Boid> boids;
 
 // TEXTURES VARIABLES
-GLuint caustic_idx = 0;
-GLuint caustic_begin = 1;
 GLuint timer = 1000 / 60;
 
 GLuint floor_texture_id;
@@ -164,22 +158,15 @@ void updateCamera() {
 }
 
 void animate_waves() {
-    // TODO: testez une borne max.
     GLint anim_time_location;
     wave_program->use();
     anim_time_location =
-            glGetUniformLocation(wave_program->id, "anim_time");
-    glUniform1f(anim_time_location, anim_time);
-    anim_time += 0.1;
+            glGetUniformLocation(wave_program->id, "anim_time");TEST_OPENGL_ERROR();
+    glUniform1f(anim_time_location, 0.005f * (float) glutGet(GLUT_ELAPSED_TIME));TEST_OPENGL_ERROR();
 }
 
 void timerFunc(int value) {
-    /*
-    caustic_idx = (caustic_idx + 1) % CAUSTICS_SIZE;
-    glActiveTexture(GL_TEXTURE1);TEST_OPENGL_ERROR();
-    glBindTexture(GL_TEXTURE_2D, caustic_idx + caustic_begin);TEST_OPENGL_ERROR();
-     */
-    animate_waves();TEST_OPENGL_ERROR();
+    animate_waves();
     glutPostRedisplay();TEST_OPENGL_ERROR();
     glutTimerFunc(timer, timerFunc, value);TEST_OPENGL_ERROR();
 }
@@ -197,7 +184,7 @@ void object_draw(GLuint program_id, bool move = true, GLuint tex = -1) {
 
     for (auto &boid : boids) {
         if (move) {
-            boid.move(boids, objects, 4 * (float) glutGet(GLUT_ELAPSED_TIME));
+            boid.move(boids, objects, 2 * (float) glutGet(GLUT_ELAPSED_TIME));
         }
         boid.draw(mv_loc, vert_loc, uv_loc, normal_loc, tex);
     }
@@ -205,20 +192,23 @@ void object_draw(GLuint program_id, bool move = true, GLuint tex = -1) {
 
 void display() {
     updateCamera();
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glDisable(GL_BLEND);TEST_OPENGL_ERROR();
-    glEnable(GL_DEPTH_TEST);
-    //glBlendFunc(GL_ONE, GL_ZERO);
+    glEnable(GL_DEPTH_TEST);TEST_OPENGL_ERROR();
+    glClearColor(0, 0, 0, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
 
+    // Update the surface waves.
     wave_program->use();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, surface_vao->vbo_ids[0]);TEST_OPENGL_ERROR();
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, surface_vao->vbo_ids[2]);TEST_OPENGL_ERROR();
     glDispatchCompute((WAVE_SIZE + 7) / 8, (WAVE_SIZE + 7) / 8, 1);TEST_OPENGL_ERROR();
     glMemoryBarrier(GL_ALL_BARRIER_BITS);TEST_OPENGL_ERROR();
 
+    // Render the environment map
     glBindFramebuffer(GL_FRAMEBUFFER, depth_framebuffer_id);TEST_OPENGL_ERROR();
+
     glViewport(0, 0, WAVE_SIZE, WAVE_SIZE);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
 
@@ -231,14 +221,12 @@ void display() {
     floor_object->draw(mv_loc, vert_loc, uv_loc, normal_loc);
     object_draw(depth_program->id, true);
 
-    glEnable(GL_BLEND);TEST_OPENGL_ERROR();
+    // Render the color buffer
     glBindFramebuffer(GL_FRAMEBUFFER, color_framebuffer_id);
+    // fixed viewport since we don't want to resize the framebuffer texture everytime.
     glViewport(0, 0, 1920, 1080);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);TEST_OPENGL_ERROR();
-
-    glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);TEST_OPENGL_ERROR();
-    glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ZERO);TEST_OPENGL_ERROR();
 
     floor_program->use();
     floor_vao->draw();
@@ -253,48 +241,43 @@ void display() {
 
     background_vao->draw();
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    //glReadPixels(0, 0, 1920, 1080, GL_RGBA, GL_FLOAT, pixels);
-
-    glClearColor(0, 0, 0, 1.0);
+    // Render the godrays frame buffer
     glBindFramebuffer(GL_FRAMEBUFFER, godray_framebuffer_id);TEST_OPENGL_ERROR();
+    glClearColor(0, 0, 0, 1.0);
     glClear(GL_COLOR_BUFFER_BIT);TEST_OPENGL_ERROR();
-
-    godray_program->use();
-    glEnable(GL_PROGRAM_POINT_SIZE);TEST_OPENGL_ERROR();
-    //glEnable(GL_LINE_STIPPLE);
     glEnable(GL_BLEND);
     glDisable(GL_DEPTH_TEST);
     glLineWidth(5.f);
+    // Blending functions, additive for the color and min for the alpha since we want to keep the minimal depth (unused for godrays).
     glBlendEquationSeparate(GL_FUNC_ADD, GL_MIN);TEST_OPENGL_ERROR();
     glBlendFuncSeparate(GL_SRC_COLOR, GL_ONE, GL_ONE, GL_ZERO);TEST_OPENGL_ERROR();
 
+    godray_program->use();
 
     vert_loc = glGetAttribLocation(godray_program->id, "position");TEST_OPENGL_ERROR();
     uv_loc = glGetAttribLocation(godray_program->id, "uv");TEST_OPENGL_ERROR();
     normal_loc = glGetAttribLocation(godray_program->id, "normal");TEST_OPENGL_ERROR();
     surface_vao->draw(vert_loc, uv_loc, normal_loc, depth_texture_id);
 
-    //glReadPixels(0, 0, 1920, 1080, GL_RGBA, GL_FLOAT, pixels2);
 
+    // Render the caustic frame buffer.
     glBindFramebuffer(GL_FRAMEBUFFER, caustic_framebuffer_id);TEST_OPENGL_ERROR();
     glClear(GL_COLOR_BUFFER_BIT);TEST_OPENGL_ERROR();
 
-    caustic_program->use();
     glEnable(GL_PROGRAM_POINT_SIZE);TEST_OPENGL_ERROR();
-    //glEnable(GL_LINE_STIPPLE);
-    glEnable(GL_BLEND);
-    glDisable(GL_DEPTH_TEST);
+
+    // Blending functions, additive for the color and min for the alpha since we want to keep the minimal depth.
     glBlendEquationSeparate(GL_FUNC_ADD, GL_MIN);TEST_OPENGL_ERROR();
     glBlendFuncSeparate(GL_SRC_COLOR, GL_ONE, GL_ONE, GL_ZERO);TEST_OPENGL_ERROR();
+
+    caustic_program->use();
 
     vert_loc = glGetAttribLocation(caustic_program->id, "position");TEST_OPENGL_ERROR();
     uv_loc = glGetAttribLocation(caustic_program->id, "uv");TEST_OPENGL_ERROR();
     normal_loc = glGetAttribLocation(caustic_program->id, "normal");TEST_OPENGL_ERROR();
     surface_vao->draw(vert_loc, uv_loc, normal_loc, depth_texture_id);
 
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-
+    // Blur caustics and godrays (two gaussian blur passes).
     glClearTexImage(caustic_blurred_texture_id, 0, GL_RGBA, GL_FLOAT, nullptr);TEST_OPENGL_ERROR();
     blur_program->use();
     glBindImageTexture(0, caustic_texture_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
@@ -307,7 +290,6 @@ void display() {
     glDispatchCompute((1920 + 7) / 8, (1080 + 7) / 8, 1);TEST_OPENGL_ERROR();
     glMemoryBarrier(GL_ALL_BARRIER_BITS);TEST_OPENGL_ERROR();
 
-
     glBindImageTexture(0, godray_texture_id, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RGBA16F);
     glBindImageTexture(1, caustic_blurred_texture_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA16F);
     glDispatchCompute((1920 + 7) / 8, (1080 + 7) / 8, 1);TEST_OPENGL_ERROR();
@@ -318,10 +300,9 @@ void display() {
     glDispatchCompute((1920 + 7) / 8, (1080 + 7) / 8, 1);TEST_OPENGL_ERROR();
     glMemoryBarrier(GL_ALL_BARRIER_BITS);TEST_OPENGL_ERROR();
 
+    // Draw the display buffer by combining the textures of all other frame buffers.
     glBindFramebuffer(GL_FRAMEBUFFER, 0);TEST_OPENGL_ERROR();
-    glClearColor(0, 0, 0, 0);
     glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_LESS);
     glDisable(GL_BLEND);
     combine_program->use();
 
@@ -329,15 +310,12 @@ void display() {
     uv_loc = glGetAttribLocation(combine_program->id, "uv");TEST_OPENGL_ERROR();
     normal_loc = glGetAttribLocation(combine_program->id, "normal");TEST_OPENGL_ERROR();
     mv_loc = glGetUniformLocation(combine_program->id, "model_matrix");TEST_OPENGL_ERROR();
-    //glActiveTexture(GL_TEXTURE0);
 
     floor_object->draw(mv_loc, vert_loc, uv_loc, normal_loc, -2);
     background_vao->draw(vert_loc, uv_loc, normal_loc, -2);
     surface_vao->draw(vert_loc, uv_loc, normal_loc, -2);
 
     object_draw(combine_program->id, false, -2);
-
-    //surface_program->use();
 
     glutSwapBuffers();
 }
@@ -392,6 +370,7 @@ void init_GL() {
     glPixelStorei(GL_PACK_ALIGNMENT,1);
 }
 
+// Initialize surface grid according to the wave size parameter.
 void init_surface_vao() {
 
     int N = WAVE_SIZE;
@@ -440,16 +419,19 @@ void init_surface_vao() {
 void init_object_vbo() {
 
     // Surface
+    surface_program->use();
     init_surface_vao();
 
+    // Floor
+    floor_program->use();
     GLint vertex_location = glGetAttribLocation(floor_program->id, "position");TEST_OPENGL_ERROR();
     GLint uv_location = glGetAttribLocation(floor_program->id, "uv");TEST_OPENGL_ERROR();
 
-    // Floor
     floor_vao = Vao::make_vao(vertex_location, floor_vbo, floor_texture_id, uv_location, uv_buffer_data);
     floor_object = new Object(std::vector<Vao *>(1, floor_vao), glm::vec3(0, 0, 0), 0, 0, 0, 1.f, 1.f);
 }
 
+// Load object files.
 std::vector<Vao *> init_obj_vao(const char *filename) {
     GLint vertex_location = glGetAttribLocation(obj_program->id, "position");TEST_OPENGL_ERROR();
     GLint normal_location = glGetAttribLocation(obj_program->id, "normal");TEST_OPENGL_ERROR();
@@ -511,7 +493,9 @@ std::vector<Vao *> init_obj_vao(const char *filename) {
     return obj_vaos;
 }
 
+// Init boids and objects with random position.
 void init_objects() {
+
     std::vector<Vao *> fish_vaos = init_obj_vao("../image_test/objs/Fish1.obj");
     std::vector<Vao *> fish_2_vaos = init_obj_vao("../image_test/objs/Fish2.obj");
     // std::vector<Vao *> fish_3_vaos = init_obj_vao("../image_test/objs/Manta ray.obj");
@@ -524,7 +508,7 @@ void init_objects() {
     for (size_t i = 0; i < 100; ++i) {
         boids.emplace_back(
                 Boid(objects, fish_vaos,
-                     glm::vec3(-100.f, -50.f, -100.f),
+                     glm::vec3(-100.f, -80.f, -100.f),
                      glm::vec3(100.f, -140.f, 100.f),
                      -45.f, 45.f,
                      0.f, 360.f,
@@ -535,7 +519,7 @@ void init_objects() {
 
         boids.emplace_back(
                 Boid(objects, fish_2_vaos,
-                     glm::vec3(-100.f, -50.f, -100.f),
+                     glm::vec3(-100.f, -80.f, -100.f),
                      glm::vec3(100.f, -140.f, 100.f),
                      -45.f, 45.f,
                      0.f, 360.f,
@@ -605,8 +589,7 @@ void init_uniform(GLuint program_id) {
 }
 
 void init_deferred_uniform(GLuint program_id) {
-    float zNear = 1.f;
-    float zFar = 1000.f;
+    // Initializing light uniforms.
     glm::mat4 projection_matrix = glm::perspective(M_PI_2f32 * 0.8f, 1.f, 5.f, 1000.f);
 
     GLint mp_loc = glGetUniformLocation(program_id, "projection_matrix_light");TEST_OPENGL_ERROR();
@@ -630,6 +613,7 @@ void init_deferred_uniform(GLuint program_id) {
     glUniform1i(tex_location, 0);TEST_OPENGL_ERROR();
 }
 
+// Init textures and frame buffers.
 void init_textures() {
     int width, height;
     GLint tex_location;
@@ -643,6 +627,7 @@ void init_textures() {
 
     std::cout << "floor texture " << width << ", " <<  height << "\n";
 
+    // Init floor texture.
     floor_program->use();
     glGenTextures(1, &floor_texture_id);TEST_OPENGL_ERROR();
     glActiveTexture(GL_TEXTURE0);TEST_OPENGL_ERROR();
@@ -657,8 +642,9 @@ void init_textures() {
     tex_location = glGetUniformLocation(floor_program->id, "texture_sampler");TEST_OPENGL_ERROR();
     glUniform1i(tex_location, 0);TEST_OPENGL_ERROR();
 
-
     delete floor_texture;
+
+    // Init depth framebuffer & texture.
     glGenFramebuffers(1, &depth_framebuffer_id);
     glBindFramebuffer(GL_FRAMEBUFFER, depth_framebuffer_id);
 
@@ -666,11 +652,12 @@ void init_textures() {
     glActiveTexture(GL_TEXTURE0);TEST_OPENGL_ERROR();
     glBindTexture(GL_TEXTURE_2D, depth_texture_id);TEST_OPENGL_ERROR();
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F_ARB, WAVE_SIZE, WAVE_SIZE, 0, GL_RGBA, GL_FLOAT,nullptr);TEST_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);TEST_OPENGL_ERROR();
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);TEST_OPENGL_ERROR();
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);TEST_OPENGL_ERROR();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);TEST_OPENGL_ERROR();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);TEST_OPENGL_ERROR();
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, depth_texture_id, 0);TEST_OPENGL_ERROR();
+    // Depth render buffer for depth test.
     GLuint rboDepth;
     glGenRenderbuffers(1, &rboDepth);
     glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
@@ -678,6 +665,7 @@ void init_textures() {
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);TEST_OPENGL_ERROR();
     glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
+    // Caustic framebuffers & textures.
     glGenFramebuffers(1, &caustic_framebuffer_id);
     glBindFramebuffer(GL_FRAMEBUFFER, caustic_framebuffer_id);
 
@@ -687,33 +675,36 @@ void init_textures() {
     glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F_ARB, 1920, 1080, 0, GL_RGBA, GL_FLOAT,nullptr);TEST_OPENGL_ERROR();
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, caustic_texture_id, 0);TEST_OPENGL_ERROR();
 
+    // Godray framebuffers & textures.
     glGenFramebuffers(1, &godray_framebuffer_id);
     glBindFramebuffer(GL_FRAMEBUFFER, godray_framebuffer_id);
 
-    // Godray framebuffer
     glGenTextures(1, &godray_texture_id);TEST_OPENGL_ERROR();
     glBindTexture(GL_TEXTURE_RECTANGLE, godray_texture_id);TEST_OPENGL_ERROR();
     glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F_ARB, 1920, 1080, 0, GL_RGBA, GL_FLOAT,nullptr);TEST_OPENGL_ERROR();
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, godray_texture_id, 0);TEST_OPENGL_ERROR();
 
+    // Color framebuffers & textures.
     glGenFramebuffers(1, &color_framebuffer_id);
     glBindFramebuffer(GL_FRAMEBUFFER, color_framebuffer_id);
 
-    // Color framebuffer
     glGenTextures(1, &color_texture_id);TEST_OPENGL_ERROR();
     glActiveTexture(GL_TEXTURE0);TEST_OPENGL_ERROR();
     glBindTexture(GL_TEXTURE_RECTANGLE, color_texture_id);TEST_OPENGL_ERROR();
     glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F_ARB, 1920, 1080, 0, GL_RGBA, GL_FLOAT,nullptr);TEST_OPENGL_ERROR();
     glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, color_texture_id, 0);TEST_OPENGL_ERROR();
+    // Depth render buffer pour le color buffer.
     glGenRenderbuffers(1, &rboDepth);
     glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16_ARB, 1920, 1080);TEST_OPENGL_ERROR();
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);TEST_OPENGL_ERROR();
 
+    // texture intermediaire pour le blur des caustiques et godrays.
     glGenTextures(1, &caustic_blurred_texture_id);TEST_OPENGL_ERROR();
     glBindTexture(GL_TEXTURE_RECTANGLE, caustic_blurred_texture_id);TEST_OPENGL_ERROR();
     glTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_RGBA16F_ARB, 1920, 1080, 0, GL_RGBA, GL_FLOAT,nullptr);TEST_OPENGL_ERROR();
 
+    // On attache les differentes textures au combine program.
     combine_program->use();
     glActiveTexture(GL_TEXTURE2);TEST_OPENGL_ERROR();
     glBindTexture(GL_TEXTURE_RECTANGLE, color_texture_id);TEST_OPENGL_ERROR();
@@ -731,10 +722,9 @@ void init_textures() {
     glBindRenderbuffer(GL_RENDERBUFFER, 0);TEST_OPENGL_ERROR();
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);TEST_OPENGL_ERROR();
-
-    surface_program->use();
 }
 
+// On initialise les differents shaders.
 bool init_shaders() {
     surface_program = program::make_program("../shaders/surface/surface.vert",
                                             "../shaders/surface/surface.frag");
@@ -886,7 +876,7 @@ int main(int argc, char *argv[]) {
     init_deferred_uniform(godray_program->id);
     init_uniform(godray_program->id);
 
-    // Initialize programs vector.
+    // Liste des programmes qui vont avoir besoin des matrices de camera en temps reel.
     programs.emplace_back(surface_program);
     programs.emplace_back(floor_program);
     programs.emplace_back(obj_program);
@@ -894,10 +884,6 @@ int main(int argc, char *argv[]) {
     programs.emplace_back(caustic_program);
     programs.emplace_back(godray_program);
     programs.emplace_back(combine_program);
-
-    surface_program->use();
-
-    //display();
 
     glutMainLoop();
 }

@@ -9,32 +9,37 @@ const float PI = 3.141592653;
 
 float sigma = 3;
 
+// Fonction gaussienne.
 float g(float x, float y) {
     return (1 / (2 * PI * sigma)) * exp(-(x * x + y * y) / (sigma * sigma));
 }
 
 void main() {
-    int KERNEL_SIZE = 5;
+    int KERNEL_SIZE = 9;
     ivec2 size = imageSize(input_img);
     ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
     if (coord.x >= size.x || coord.y >= size.y) {
         return;
     }
+    // On garde la depth.
     vec4 color = imageLoad(input_img, coord);
 
+    // Flou gaussien non optimisé (un enfer à optimiser pour un grand kernel)
     vec3 accum = vec3(0);
     float sum = 0;
     for (int i = -KERNEL_SIZE/2; i <= KERNEL_SIZE/2; ++i) {
         for (int j = -KERNEL_SIZE/2; j <= KERNEL_SIZE/2; ++j) {
             ivec2 xy = coord + ivec2(i, j);
-            float k = g(i, j);
-            accum += k * imageLoad(input_img, xy).xyz;
-            sum += k;
+            if (xy.x >= 0 && xy.y >= 0 && xy.x < size.x && xy.y < size.y) {
+                float k = g(i, j);
+                accum += k * imageLoad(input_img, xy).xyz;
+                sum += k;
+            }
         }
     }
+    // On normalise le resultat.
     vec3 res = accum / sum;
 
     if (res.x > 0.0f)
         imageStore(out_img, coord, vec4(res.xxx, color.w));
-
 }

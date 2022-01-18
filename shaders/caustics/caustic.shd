@@ -4,8 +4,7 @@ layout( triangles ) in;
 
 layout( points, max_vertices=3) out;
 
-uniform float zNear;
-uniform float zFar;
+// Geometry shader pour transformer tous les triangles en points.
 
 in vec3 newPos[3];
 in vec3 oldPos[3];
@@ -14,31 +13,34 @@ in vec3 color[3];
 out vec3 intensity;
 out vec3 pos;
 
+// Facteurs d'attenuation dependant de la profondeur.
 float attenuation = 0.1;
+// Facteurs d'amplification de l'intensité final
 float amplification = 0.12;
+// Fonction d'intensité du caustic qui baisse en fonction de la profondeur
 float caustic_intensity(vec3 pos) {
     return amplification * exp(-attenuation * -pos.y / 30.f);
 }
 
 void main() {
+    // zNear et zFar hard codés principalement pour l'effet visuel.
     float zNear = 8.f;
     float zFar = 500.f;
-    vec4 p = (gl_in[0].gl_Position + gl_in[1].gl_Position + gl_in[2].gl_Position) / 3.0;
-    //float oldArea = length(cross(oldPos[1] - oldPos[0], oldPos[2] - oldPos[0])) / 2.0;
-    //float newArea = length(cross(newPos[1] - newPos[0], newPos[2] - newPos[0])) / 2.0;
-    float smax = 80.f;
+    // Calcul de la taille du point en fonction de sa distance à l'écran.
+    float smax = 20.f;
     float smin = 10.f;
     float a = smax - zFar * (smax - smin) / (zFar - zNear);
     float b = zNear * zFar * (smax - smin) / (zFar - zNear);
-
     float s = a + b / (gl_in[0].gl_Position.z);
-    gl_Position = gl_in[0].gl_Position;
     gl_PointSize = s;
+    // On ne peut pas mettre le point au milieu du triangle car un des vertex peut etre incorrect ou alors on peut se retrouver avec des caustiques volantes proche des poissons.
+    gl_Position = gl_in[0].gl_Position;
     if (color[0].x > 0) {
         intensity = caustic_intensity(newPos[0]).xxx;
         pos = newPos[0];
         EmitVertex();
     }
+    // Envoi des trois points pour eviter de manquer des vertex (Opti : Partir de points pour eviter de dupliquer les vertices).
     s = a + b / (gl_in[1].gl_Position.z);
     gl_Position = gl_in[1].gl_Position;
     gl_PointSize = s;
@@ -48,7 +50,6 @@ void main() {
         EmitVertex();
     }
 
-
     s = a + b / (gl_in[2].gl_Position.z);
     gl_Position = gl_in[2].gl_Position;
     gl_PointSize = s;
@@ -57,11 +58,4 @@ void main() {
         pos = newPos[2];
         EmitVertex();
     }
-
-    /*
-    gl_Position = gl_in[1].gl_Position;
-    EmitVertex();
-    gl_Position = gl_in[2].gl_Position;
-    EmitVertex();
-    */
 }

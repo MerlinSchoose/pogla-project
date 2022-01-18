@@ -2,6 +2,7 @@
 
 layout (local_size_x = 8, local_size_y = 8) in;
 
+// Compute shader pour faire les vagues.
 uniform float anim_time;
 
 layout (std430, binding = 1) buffer position_buffer {
@@ -12,21 +13,27 @@ layout (std430, binding = 2) buffer normals_buffer {
     float normals[];
 };
 
+// Fonction de calcul de la hauteur d'une vague, qui utilise des sommes de sinusoides.
 float wave_height(float x, float z, float t) {
     float h = 0.0f;
     vec2 p = vec2(x, z);
-    vec2 dir = vec2(1.0, 0);
+    vec2 dir;
     float speed = 0.5;
     float frequency = 0.05;
     float A = 2.8;
     float angle = 0.0;
     for (int i = 0; i < 10; ++i) {
+        // On orient la vague dans une direction qui a l'air aleatoire.
         dir = vec2(cos(angle), sin(angle));
+        // On fait le dot entre la direction et le point p. Permet de donner une direction principale differente entre les vagues.
+        // Cela a comme conséquence de rendre les vagues symétriques centrées en 0, 0. Une meilleure version utiliserait du bruit.
+        // Opti : Utiliser des meilleures fonctions de vague, utiliser des FFT
         h += sin(t * speed + dot(dir, p) * frequency) * A;
-        //p += dir * cos(t * speed + dot(dir, p) * frequency) * A * 4;
+        // Chanque nouvelle sinusoide (octave) a une frequence plus elevée et une amplitude diminuée.
         speed *= 1.0;
         frequency *= 1.2;
         A *= 0.8;
+        // On ajoute une valeur d'angle biaisée pour donner un effet aléatoire de la direction des sinusoides.
         angle += 12.0;
     }
     return h;
@@ -38,6 +45,7 @@ void main() {
 
     float diff = 2e-3;
 
+    // On calcule trois hauteurs pour calculer la normale. (Opti, utiliser les valeurs des thread adjacents avec une granularité suffisamment grande).
     float h = wave_height(p.x, p.z, anim_time);
     float h1 = wave_height(p.x + diff, p.z, anim_time);
     float h2 = wave_height(p.x, p.z + diff, anim_time);
@@ -45,6 +53,7 @@ void main() {
     vec3 p0 = vec3(p.x, h, p.z);
     vec3 p1 = vec3(p.x + diff, h1, p.z);
     vec3 p2 = vec3(p.x, h2, p.z + diff);
+    // Nouvelle normale toujours orientée vers le haut. (Peut surement causer des bugs avec des amplitudes elevees).
     vec3 n = normalize(cross(p1 - p0, p2 - p0));
     if (n.y < 0)
         n = -n;
